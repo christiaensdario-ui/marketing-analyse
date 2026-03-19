@@ -2,31 +2,55 @@
 
 ## Laatste opslag
 **Datum:** 2026-03-19
-**Commit hash:** `019c64f`
+**Commit hash:** `8a2002e`
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
 
 ---
 
-## Samenvatting wijzigingen (commit 019c64f)
+## Samenvatting wijzigingen (commit 8a2002e)
 
-### Structuurwijzigingen
-1. **Kanaalstrategie** — Nieuwe sectie C in interne analyse: actieve platformen, onderbouwing per platform, primair kanaal, ontbrekende kanalen
-2. **Formats uitgebreid** — Elk format (foto/video/reels/carousels) heeft nu 3 velden: percentage, uitleg, voorbeeldcontent
-3. **Performance hernoemd** — Velden hernoemd naar `gemiddeldeLikes`, `gemiddeldeComments`, `gemiddeldeShares`, `gemiddeldeEngagementRate` (met achterwaartse migratie)
-4. **Concurrentieanalyse** — Multi-concurrent support (max 5), elk met eigen naamveld, toevoegen/verwijderen knoppen
-5. **Samenwerkingen en netwerk** — Nieuwe sectie in externe analyse: potentiële partners, gatekeepers, bestaande samenwerkingen, ontbrekende samenwerkingen
-6. **Platformanalyse verwijderd** — Sectie volledig verwijderd uit formulier, dashboard en datastructuur
+### Dashboardvisualisatie
+1. **IconDataCard** — Alle tekstvelden in afgebakende kaartjes met passend icoon per veld
+2. **Badge-detectie** — Automatische gekleurde badge op sleutelwoorden: sterk/consistent/goed/hoog → groen · matig/gemengd/beperkt → oranje · zwak/inconsistent/laag/geen → rood
+3. **Sectie-achtergronden** — Subtiele achtergrondkleuren per sectie (slate/violet/blue/amber/teal/emerald/purple/orange/sky/rose)
+4. **Tag-lijstvelden** — Actieve platformen, teamleden, gatekeepers, potentiële partners, andere labels als tag-chips
 
-### Visuele dashboardverbeteringen
-1. **Contentmix donutgrafiek** — SVG donut zonder externe library; invoer via dropdown (10/20/30/50 posts) + absolute aantallen per contenttype; percentages automatisch berekend
-2. **Formats staafdiagrammen** — Horizontale gekleurde balken per format met uitleg en voorbeeldcontent eronder
-3. **Doelgroep vergelijking** — Blauw blok (gewenste doelgroep) naast oranje blok (werkelijke doelgroep)
-4. **Concurrentietabel** — Scrollbare vergelijkingstabel: concurrenten als kolommen, analysecomponenten als rijen
-5. **Community score-meter** — Visuele meter van "Publiek" naar "Echte community" op basis van ingevulde velden
+### Kleurcodering scores
+5. **Engagement rate** — Rood <2%, oranje 2-5%, groen >5% — met badge en gekleurde achtergrond
+6. **Community score** — Rood <40%, oranje 40-70%, groen >70%
+7. **Contentmix** — Oranje waarschuwing bij >60% dominantie in donut-legenda
 
-### Migratie
-- Bestaande `localStorage`-data wordt automatisch omgezet naar de nieuwe structuur via `migrateAnalysis()`
+### Performance fix
+8. **Balken verwijderd** — Likes/Comments/Shares als grote getallen in aparte kaartjes, geen misleidende balkbreedte
+9. **Engagement rate apart** — Groot gekleurd kaartje met badge (Laag/Gemiddeld/Goed)
+
+### Team hiërarchie (OrgChart)
+10. **Visueel organogram** — team/leden, rollen en werking samengevoegd in één visual
+    - Eindverantwoordelijke bovenaan (donker blok)
+    - Overige leden in rij eronder
+    - Rollen als beschrijvingstekst in midden
+    - Werking als blauw "Beslissingsproces" onderaan
+
+### PDF export (split button)
+11. **PDF als hoofdexport** — Knop exporteert via `window.print()` naar volledig rapport
+12. **JSON als secundaire optie** — Dropdown-pijltje naast PDF-knop
+13. **PDF-inhoud** — Alle secties: A–J intern + A–E extern, SWOT-grid 2×2, concurrentietabel
+
+### Samenvattingspagina
+14. **Eerste tab** — Standaard zichtbaar bij openen van een analyse
+15. **Metrics** — Community score + engagement rate als gekleurde blokken
+16. **Contentmix dominant** — Welke categorie overheerst + waarschuwing bij >60%
+17. **Doelgroep** — Gewenst vs werkelijk met waarschuwing bij verschil
+18. **SWOT highlights** — Top 2 sterktes + top 2 bedreigingen
+19. **Gaps** — 5 automatisch gegenereerde gaps op basis van data
+
+### Automatische inzichten (4 verbindingen)
+20. **Kanaal mismatch** — Doelgroep gebruikt platform dat ontbreekt in kanaalstrategie
+21. **Promo vs resonantie** — Promo >50% + zwakke emotie/doelgroepresonantie
+22. **Tone vs community** — Afstandelijke tone of voice + community score <50%
+23. **Budget vs ambitie** — Beperkt budget + internationale gewenste doelgroep
+24. **Dubbele zichtbaarheid** — Inzichten op samenvattingspagina én op relevante subpagina's
 
 ---
 
@@ -37,10 +61,13 @@
 
 ### Features actief
 - Multi-client analyse beheer (aanmaken, opslaan, openen, verwijderen)
-- JSON export en import
-- Interne analyse: Organisatie, Merkidentiteit, Kanaalstrategie, Doelgroep, Contentanalyse, Strategische content, Community, Middelen, SWOT
-- Externe analyse: Concurrentie (multi), Samenwerkingen, Markt/Scene, Doelgroepgedrag, Culturele trends
-- Visueel dashboard met donut, staafdiagrammen, vergelijkingstabel, score-meter
+- PDF export (print-dialoog) + JSON export/import
+- Samenvattingspagina als standaard eerste tab
+- Interne analyse: Organisatie (met OrgChart), Merkidentiteit, Kanaalstrategie, Doelgroep, Content, Strategie, Community, Middelen, SWOT
+- Externe analyse: Concurrentie (multi, scrollbare tabel), Samenwerkingen, Markt/Scene, Doelgroepgedrag, Culturele trends (met richtingspijlen)
+- Dashboard: gekleurde badges, IconDataCards, tag-chips, OrgChart, performance metrics
+- Visueel: donut contentmix, format-balken, doelgroep vergelijking, community score-meter
+- Automatische inzichten: 4 data-verbindingen gedetecteerd en weergegeven
 - LocalStorage persistentie met automatische migratie
 
 ### Tech stack
