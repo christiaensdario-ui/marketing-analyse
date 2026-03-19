@@ -233,47 +233,77 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     // ─── Insights detection ───────────────────────────────────────────────────
     function detectInsights(analysis) {
       const insights = [];
-      const { interneAnalyse: int, externeAnalyse: ext } = analysis;
+      const int = analysis.interneAnalyse || {};
+      const ext = analysis.externeAnalyse || {};
 
-      // 1 — Doelgroep platforms vs kanaalstrategie
-      const doelgroepPlatforms = ((ext.doelgroepgedrag?.platformgebruik || '') + ' ' + (int.doelgroep?.gedrag || '')).toLowerCase();
+      // 1 — Kanaal mismatch: doelgroep gebruikt platform dat ontbreekt in kanaalstrategie
+      const doelgroepPlatforms = (
+        (ext.doelgroepgedrag?.platformgebruik || '') + ' ' + (int.doelgroep?.gedrag || '')
+      ).toLowerCase();
       const actieveKanalen = (int.kanaalstrategie?.actievePlatformen || '').toLowerCase();
       const platforms = ['tiktok','instagram','youtube','twitter','linkedin','facebook','snapchat','spotify','soundcloud','discord','twitch','pinterest','reddit','threads'];
+      let kanaalMismatchPlatform = null;
       for (const p of platforms) {
         if (doelgroepPlatforms.includes(p) && !actieveKanalen.includes(p)) {
-          insights.push({ id: 'kanaal-mismatch', type: 'tension', icon: '📱', title: 'Kanaal mismatch', text: `Mismatch gedetecteerd: ${p.charAt(0).toUpperCase()+p.slice(1)} wordt gebruikt door je doelgroep maar ontbreekt in je kanaalstrategie.`, pages: ['doelgroep','kanaalstrategie'] });
+          kanaalMismatchPlatform = p;
           break;
         }
       }
-
-      // 2 — Promo > 50% AND weak emotion/resonance
-      const keys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
-      const cnts = keys.map(k => Number(int.contentanalyse[k]) || 0);
-      const tot = cnts.reduce((a,b) => a+b, 0);
-      const promoPct = tot > 0 ? (cnts[0] / tot) * 100 : 0;
-      const emotieText = ((int.strategischeContent?.emotie || '') + ' ' + (int.strategischeContent?.doelgroepresonantie || '')).toLowerCase();
-      const weakWords = ['zwak','laag','beperkt','geen','matig','weinig'];
-      const emotieWeak = weakWords.some(w => new RegExp(`\\b${w}`).test(emotieText));
-      if (promoPct > 50 && emotieWeak) {
-        insights.push({ id: 'promo-emotie', type: 'tension', icon: '📢', title: 'Hoge promofocus', text: 'Hoge promofocus gecombineerd met lage emotionele resonantie — overweeg meer verbindende contentcategorieën.', pages: ['contentanalyse','strategisch'] });
+      if (kanaalMismatchPlatform) {
+        insights.push({
+          id: 'kanaal-mismatch', type: 'tension', icon: '📱', title: 'Kanaal mismatch',
+          text: `Mismatch gedetecteerd: ${kanaalMismatchPlatform.charAt(0).toUpperCase() + kanaalMismatchPlatform.slice(1)} wordt gebruikt door je doelgroep maar ontbreekt in je kanaalstrategie.`,
+          pages: ['doelgroep','kanaalstrategie']
+        });
       }
 
-      // 3 — Community score < 50% AND distant tone of voice
-      const commScore = computeCommunityScore(int.communityAnalyse);
-      const tov = ((int.merkidentiteit?.toneOfVoice || '') + ' ' + (int.strategischeContent?.toneOfVoice || '')).toLowerCase();
+      // 2 — Promo > 50% EN zwakke emotie of doelgroepresonantie
+      const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
+      const cnts = mixKeys.map(k => Number(int.contentanalyse?.[k]) || 0);
+      const tot = cnts.reduce((a,b) => a+b, 0);
+      const promoPct = tot > 0 ? (cnts[0] / tot) * 100 : 0;
+      const emotie = (int.strategischeContent?.emotie || '').toLowerCase();
+      const resonantie = (int.strategischeContent?.doelgroepresonantie || '').toLowerCase();
+      const weakWords = ['zwak','laag','beperkt','geen','matig','weinig'];
+      const emotieWeak = weakWords.some(w => emotie.includes(w) || resonantie.includes(w));
+      if (promoPct > 50 && emotieWeak) {
+        insights.push({
+          id: 'promo-emotie', type: 'tension', icon: '📢', title: 'Hoge promofocus',
+          text: 'Hoge promofocus gecombineerd met lage emotionele resonantie — overweeg meer verbindende contentcategorieën.',
+          pages: ['contentanalyse','strategisch']
+        });
+      }
+
+      // 3 — Community score < 50% EN afstandelijke tone of voice
+      const commScore = computeCommunityScore(int.communityAnalyse || {});
+      const tov = (
+        (int.merkidentiteit?.toneOfVoice || '') + ' ' + (int.strategischeContent?.toneOfVoice || '')
+      ).toLowerCase();
       const distantWords = ['afstandelijk','minimalistisch','formeel'];
       const isDistant = distantWords.some(w => tov.includes(w));
       if (commScore < 50 && isDistant) {
-        insights.push({ id: 'tone-community', type: 'tension', icon: '🗣️', title: 'Tone of voice vs. community', text: 'Afstandelijke tone of voice correleert met lage community score — overweeg een warmere communicatiestijl.', pages: ['community','merkidentiteit'] });
+        insights.push({
+          id: 'tone-community', type: 'tension', icon: '🗣️', title: 'Tone of voice vs. community',
+          text: 'Afstandelijke tone of voice correleert met lage community score — overweeg een warmere communicatiestijl.',
+          pages: ['community','merkidentiteit']
+        });
       }
 
-      // 4 — Beperkt budget AND internationale ambitie
+      // 4 — Beperkt budget EN internationale ambitie
       const budget = (int.middelen?.budget || '').toLowerCase();
       const gwDoelgroep = (int.doelgroep?.gewensteDoelgroep || '').toLowerCase();
-      const budgetBeperkt = budget.includes('beperkt') || (() => { const m = budget.match(/€\s*([\d.,]+)/); if (!m) return false; return parseFloat(m[1].replace('.','').replace(',','.')) < 1000; })();
-      const isInternationaal = gwDoelgroep.includes('internationaal') || gwDoelgroep.includes('europees');
+      const budgetBeperkt = budget.includes('beperkt') || (() => {
+        const m = budget.match(/€\s*([\d.,]+)/);
+        if (!m) return false;
+        return parseFloat(m[1].replace(/\./g,'').replace(',','.')) < 500;
+      })();
+      const isInternationaal = gwDoelgroep.includes('internationaal') || gwDoelgroep.includes('mainstream') || gwDoelgroep.includes('europees');
       if (budgetBeperkt && isInternationaal) {
-        insights.push({ id: 'budget-ambitie', type: 'tension', icon: '💰', title: 'Budget vs. internationale ambitie', text: 'Spanningsveld gedetecteerd: internationale ambitie met beperkt budget vereist een gefaseerde aanpak.', pages: ['middelen','doelgroep'] });
+        insights.push({
+          id: 'budget-ambitie', type: 'tension', icon: '💰', title: 'Budget vs. internationale ambitie',
+          text: 'Spanningsveld gedetecteerd: internationale ambitie met beperkt budget vereist een gefaseerde aanpak.',
+          pages: ['middelen','doelgroep']
+        });
       }
 
       return insights;
@@ -383,7 +413,10 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           </div>
           <div className={`${erc.bg} border ${erc.border} rounded-xl p-4 flex items-center justify-between`}>
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-1">Engagement rate</p>
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-xs font-medium text-gray-500">Engagement rate</p>
+                <Tooltip text="Onder 2% = laag, 2–5% = gemiddeld, boven 5% = goed — gebaseerd op industrie benchmark voor sociale media." />
+              </div>
               <p className={`text-2xl font-bold ${erc.text}`}>{erStr || '—'}</p>
             </div>
             {erc.label && (
@@ -551,7 +584,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       );
     }
 
-    // ─── Org chart ────────────────────────────────────────────────────────────
+    // ─── Org chart (SVG boomstructuur) ───────────────────────────────────────
     function OrgChart({ team, rollen, werking }) {
       const members = (team || '').split(/[,\n]+/).map(m => m.trim()).filter(Boolean);
       const hasData = members.length > 0 || rollen || werking;
@@ -559,41 +592,81 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
       const lead = members[0];
       const rest = members.slice(1);
+
+      const NW = 130, NH = 52, GAP = 14, TOP = 12, VGAP = 38;
+      const restCount = rest.length;
+      const totalRW = restCount > 0 ? restCount * NW + Math.max(0, restCount - 1) * GAP : 0;
+      const svgW = Math.max(NW + 40, totalRW + 40);
+      const cx = svgW / 2;
+      const leadX = cx - NW / 2;
+      const leadY = TOP;
+      const hBarY = leadY + NH + Math.floor(VGAP / 2);
+      const restY = leadY + NH + VGAP;
+      const restStartX = restCount > 0 ? (svgW - totalRW) / 2 : 0;
+      const treeH = restCount > 0 ? restY + NH + TOP : leadY + NH + TOP;
+      const trunc = (s, max = 15) => s.length > max ? s.slice(0, max - 1) + '…' : s;
+
       return (
-        <div className="space-y-1">
-          {lead && (
-            <div className="flex flex-col items-center">
-              <div className="bg-gray-900 text-white rounded-xl px-5 py-2.5 text-sm font-semibold text-center shadow-sm">
-                <span className="text-gray-400 text-xs block mb-0.5 font-normal">Eindverantwoordelijke</span>
-                {lead}
-              </div>
-              {(rest.length > 0 || rollen || werking) && <div className="w-px h-5 bg-gray-300" />}
-            </div>
-          )}
-          {rest.length > 0 && (
-            <div className="flex flex-col items-center">
-              <div className="flex flex-wrap justify-center gap-2">
-                {rest.map((m, i) => (
-                  <div key={i} className="bg-gray-100 border border-gray-200 text-gray-700 rounded-lg px-3 py-2 text-xs font-medium">
-                    {m}
-                  </div>
-                ))}
-              </div>
-              {(rollen || werking) && <div className="w-px h-5 bg-gray-300 mt-1" />}
-            </div>
-          )}
+        <div className="space-y-0">
+          {/* SVG tree */}
+          <div className="overflow-x-auto">
+            <svg width={svgW} height={treeH} className="block mx-auto" style={{ minWidth: 200 }}>
+              {/* Lead node */}
+              {lead && (
+                <g>
+                  <rect x={leadX} y={leadY} width={NW} height={NH} rx="10" fill="#111827" />
+                  <text x={cx} y={leadY + 17} textAnchor="middle" fill="#6b7280" fontSize="8" fontWeight="700" letterSpacing="0.07em">EINDVERANTWOORDELIJKE</text>
+                  <text x={cx} y={leadY + 35} textAnchor="middle" fill="white" fontSize="12.5" fontWeight="600">{trunc(lead)}</text>
+                  <title>{lead}</title>
+                </g>
+              )}
+              {/* Vertical line from lead down */}
+              {lead && restCount > 0 && (
+                <line x1={cx} y1={leadY + NH} x2={cx} y2={hBarY} stroke="#d1d5db" strokeWidth="1.5" />
+              )}
+              {/* Horizontal bar */}
+              {restCount > 1 && (
+                <line
+                  x1={restStartX + NW / 2} y1={hBarY}
+                  x2={restStartX + (restCount - 1) * (NW + GAP) + NW / 2} y2={hBarY}
+                  stroke="#d1d5db" strokeWidth="1.5"
+                />
+              )}
+              {/* Rest member nodes */}
+              {rest.map((m, i) => {
+                const nx = restStartX + i * (NW + GAP);
+                const midX = nx + NW / 2;
+                return (
+                  <g key={i}>
+                    <line x1={midX} y1={hBarY} x2={midX} y2={restY} stroke="#d1d5db" strokeWidth="1.5" />
+                    <rect x={nx} y={restY} width={NW} height={NH} rx="8" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1.5" />
+                    <text x={midX} y={restY + 31} textAnchor="middle" fill="#374151" fontSize="12" fontWeight="500">{trunc(m)}</text>
+                    <title>{m}</title>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+
+          {/* Rollen block — gestippelde verbinding */}
           {rollen && (
             <div className="flex flex-col items-center">
-              <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs text-gray-600 text-center max-w-xs w-full leading-relaxed">
-                {rollen}
+              <div className="w-px h-6" style={{ borderLeft: '2px dashed #d1d5db' }} />
+              <div className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Rollen &amp; verantwoordelijkheden</p>
+                <p className="text-xs text-gray-600 leading-relaxed">{rollen}</p>
               </div>
-              {werking && <div className="w-px h-5 bg-gray-300 mt-1" />}
             </div>
           )}
+
+          {/* Werking block — gestippelde verbinding */}
           {werking && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
-              <p className="text-xs font-semibold text-blue-600 mb-1">⚙️ Beslissingsproces</p>
-              <p className="text-xs text-gray-700 leading-relaxed">{werking}</p>
+            <div className="flex flex-col items-center mt-2">
+              <div className="w-px h-6" style={{ borderLeft: '2px dashed #d1d5db' }} />
+              <div className="w-full bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
+                <p className="text-xs font-semibold text-blue-600 mb-1">⚙️ Beslissingsproces</p>
+                <p className="text-xs text-gray-700 leading-relaxed">{werking}</p>
+              </div>
             </div>
           )}
         </div>
@@ -622,6 +695,26 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       );
     }
 
+    function Tooltip({ text }) {
+      const [show, setShow] = useState(false);
+      return (
+        <span className="relative inline-flex items-center ml-1 shrink-0">
+          <span
+            className="w-3.5 h-3.5 rounded-full bg-gray-200 text-gray-500 inline-flex items-center justify-center cursor-help hover:bg-gray-300 transition-colors select-none shrink-0"
+            style={{ fontSize: '9px', fontWeight: 700, lineHeight: 1 }}
+            onMouseEnter={() => setShow(true)}
+            onMouseLeave={() => setShow(false)}
+          >?</span>
+          {show && (
+            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 w-60 bg-gray-900 text-white text-xs rounded-xl px-3 py-2.5 shadow-xl leading-relaxed whitespace-normal pointer-events-none">
+              {text}
+              <span className="absolute left-1/2 -translate-x-1/2 top-full" style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid #111827', display: 'block' }} />
+            </span>
+          )}
+        </span>
+      );
+    }
+
     function IconDataCard({ icon, label, value, asTags }) {
       const badge = detectBadge(value);
       const empty = !value || !String(value).trim();
@@ -630,7 +723,12 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           <div className="flex items-start gap-2.5 mb-2">
             <span className="text-sm shrink-0 leading-none mt-0.5">{icon}</span>
             <span className="text-xs font-semibold text-gray-500 flex-1 leading-snug">{label}</span>
-            {badge && !empty && <BadgePill {...badge} />}
+            {badge && !empty && (
+              <span className="flex items-center gap-0.5 shrink-0">
+                <BadgePill {...badge} />
+                <Tooltip text="Groen = positief signaal, Oranje = aandachtspunt, Rood = zwak punt — gedetecteerd op basis van sleutelwoorden in de tekst." />
+              </span>
+            )}
           </div>
           {empty
             ? <p className="text-sm text-gray-300 italic pl-7">—</p>
@@ -664,6 +762,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageMerkidentiteit({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-3">
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">B</span>
             <h4 className="text-sm font-semibold text-gray-800">Merkidentiteit</h4>
@@ -675,7 +774,6 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             <IconDataCard icon="💡" label="Waarden en missie" value={data.waardenMissie} />
             <IconDataCard icon="📍" label="Huidige positionering" value={data.huidigePositionering} />
           </div>
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
@@ -683,6 +781,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageKanaalstrategie({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-3">
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">C</span>
             <h4 className="text-sm font-semibold text-gray-800">Kanaalstrategie</h4>
@@ -693,7 +792,6 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             <IconDataCard icon="⭐" label="Primair kanaal" value={data.primairKanaal} />
             <IconDataCard icon="🔍" label="Ontbrekende kanalen" value={data.ontbrekendeKanalen} />
           </div>
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
@@ -701,6 +799,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageDoelgroep({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-4">
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">D</span>
             <h4 className="text-sm font-semibold text-gray-800">Doelgroep (huidige)</h4>
@@ -738,7 +837,6 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               Blauw = wie je wil bereiken · Oranje = wie je nu bereikt
             </p>
           )}
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
@@ -747,6 +845,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const formatColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b'];
       return (
         <div className="fade-in space-y-4">
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
           <DCard letter="E" title="Contentmix">
             <DonutChart data={data} />
           </DCard>
@@ -766,7 +865,6 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           <DCard title="Performance (gemiddelden)">
             <PerformancePanel data={data} />
           </DCard>
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
@@ -782,6 +880,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       ];
       return (
         <div className="fade-in space-y-3">
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">G</span>
             <h4 className="text-sm font-semibold text-gray-800">Strategische contentanalyse</h4>
@@ -791,7 +890,6 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               <IconDataCard key={i} icon={item.icon} label={item.label} value={item.value} />
             ))}
           </div>
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
@@ -817,7 +915,10 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
       return (
         <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Community score</p>
+          <div className="flex items-center gap-1 mb-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Community score</p>
+            <Tooltip text="Onder 40% = publiek, 40–70% = actieve community, boven 70% = echte community — score gebaseerd op interactie in comments, terugkerende fans, UGC en betrokkenheid." />
+          </div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-gray-400">Publiek</span>
             <span className="text-xs font-bold" style={{ color }}>{label}</span>
@@ -844,6 +945,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageCommunity({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-4">
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">H</span>
             <h4 className="text-sm font-semibold text-gray-800">Community analyse</h4>
@@ -870,7 +972,6 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             </div>
           </DCard>
           <CommunityMeter data={data} />
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
@@ -878,10 +979,10 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageMiddelen({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-3">
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
           <DCard letter="I" title="Middelen (resources)">
             <MiddelenGrid data={data} />
           </DCard>
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
@@ -1114,12 +1215,18 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           {/* Key metrics */}
           <div className="grid grid-cols-2 gap-3">
             <div className={`${commC.bg} border ${commC.border} rounded-xl p-4`}>
-              <p className="text-xs font-medium text-gray-500 mb-2">Community score</p>
+              <div className="flex items-center gap-1 mb-2">
+                <p className="text-xs font-medium text-gray-500">Community score</p>
+                <Tooltip text="Onder 40% = publiek, 40–70% = actieve community, boven 70% = echte community." />
+              </div>
               <p className={`text-3xl font-bold ${commC.text}`}>{communityPct}%</p>
               <p className={`text-xs font-semibold mt-1 ${commC.text}`}>{commLabel}</p>
             </div>
             <div className={`${erC.bg} border ${erC.border} rounded-xl p-4`}>
-              <p className="text-xs font-medium text-gray-500 mb-2">Engagement rate</p>
+              <div className="flex items-center gap-1 mb-2">
+                <p className="text-xs font-medium text-gray-500">Engagement rate</p>
+                <Tooltip text="Onder 2% = laag, 2–5% = gemiddeld, boven 5% = goed — industrie benchmark." />
+              </div>
               <p className={`text-3xl font-bold ${erC.text}`}>{erStr || '—'}</p>
               {erC.label && <p className={`text-xs font-semibold mt-1 ${erC.text}`}>{erC.label}</p>}
             </div>
