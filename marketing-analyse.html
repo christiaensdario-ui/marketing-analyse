@@ -15,6 +15,8 @@
     * { box-sizing: border-box; }
     .subtab-bar::-webkit-scrollbar { display: none; }
     .subtab-bar { -ms-overflow-style: none; scrollbar-width: none; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { opacity: 1; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -24,16 +26,21 @@
     const { useState, useRef, useEffect } = React;
 
     // ─── Data structure ───────────────────────────────────────────────────────
+    const emptyFormat = () => ({ percentage: '', uitleg: '', voorbeelden: '' });
+    const emptyCompetitor = () => ({ naam: '', positionering: '', branding: '', content: '', community: '', engagement: '', differentiatie: '', watDoenZijNiet: '' });
+
     const emptyData = () => ({
       interneAnalyse: {
         organisatie: { labelType: '', geschiedenis: '', team: '', rollenManagement: '', werking: '' },
         merkidentiteit: { visuelIdentiteit: '', toneOfVoice: '', consistentieBranding: '', waardenMissie: '', huidigePositionering: '' },
+        kanaalstrategie: { actievePlatformen: '', onderbouwingPerPlatform: '', primairKanaal: '', ontbrekendeKanalen: '' },
         doelgroep: { wieVolgt: '', leeftijdInteresses: '', gedrag: '', engagement: '', communityInteractie: '', gewensteDoelgroep: '', werkelijkeDoelgroep: '' },
         contentanalyse: {
-          contentmixPromo: '', contentmixBehindScenes: '', contentmixCommunity: '', contentmixStorytelling: '', contentmixEvents: '', contentmixMemes: '',
-          formatsFoto: '', formatsVideo: '', formatsReels: '', formatsCarousels: '',
+          contentmixTotaal: 20,
+          contentmixPromo: 0, contentmixBehindScenes: 0, contentmixCommunity: 0, contentmixStorytelling: 0, contentmixEvents: 0, contentmixMemes: 0,
+          formatsFoto: emptyFormat(), formatsVideo: emptyFormat(), formatsReels: emptyFormat(), formatsCarousels: emptyFormat(),
           frequentie: '',
-          performanceLikes: '', performanceComments: '', performanceShares: '', performanceEngagementRate: '',
+          gemiddeldeLikes: '', gemiddeldeComments: '', gemiddeldeShares: '', gemiddeldeEngagementRate: '',
         },
         strategischeContent: { positioneringsconsistentie: '', toneOfVoice: '', storytelling: '', emotie: '', doelgroepresonantie: '', formatstrategie: '' },
         communityAnalyse: { interactieComments: '', terugkerendeFans: '', userGeneratedContent: '', dmInteracties: '', communityBetrokkenheid: '', publiefOfCommunity: '' },
@@ -41,13 +48,70 @@
         swot: { strengths: '', weaknesses: '', opportunities: '', threats: '' },
       },
       externeAnalyse: {
-        concurrentieanalyse: { positionering: '', branding: '', content: '', community: '', engagement: '', differentiatie: '', watDoenZijNiet: '' },
+        concurrentieanalyse: [emptyCompetitor()],
         marktSceneAnalyse: { grootteScene: '', populariteitGenre: '', aantalEvents: '', andereLabels: '', marktverzadiging: '' },
         doelgroepgedrag: { ontdekkingMuziek: '', platformgebruik: '', motivatie: '', invloeden: '' },
         cultureleTrends: { genrePopulariteit: '', nostalgieTrends: '', diyCultuur: '', authenticiteitVsCommercialisering: '' },
-        platformAnalyse: { instagramReach: '', tiktokDiscoverability: '', spotifyAlgoritmes: '', youtubeCultuur: '' },
+        samenwerkingen: { potentielePartners: '', gatekeepers: '', bestaandeSamenwerkingen: '', ontbrekendeSamenwerkingen: '' },
       },
     });
+
+    // Migrate old saved data to new structure
+    function migrateAnalysis(raw) {
+      const base = emptyData();
+      const int = raw.interneAnalyse || {};
+      const ext = raw.externeAnalyse || {};
+
+      // Migrate formats: string → object
+      const migrateFormat = (v) => (v && typeof v === 'object') ? v : emptyFormat();
+      const ca = int.contentanalyse || {};
+      const toInt = (v) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
+      const migratedCa = {
+        ...base.interneAnalyse.contentanalyse,
+        ...ca,
+        contentmixTotaal: ca.contentmixTotaal || 20,
+        contentmixPromo: toInt(ca.contentmixPromo),
+        contentmixBehindScenes: toInt(ca.contentmixBehindScenes),
+        contentmixCommunity: toInt(ca.contentmixCommunity),
+        contentmixStorytelling: toInt(ca.contentmixStorytelling),
+        contentmixEvents: toInt(ca.contentmixEvents),
+        contentmixMemes: toInt(ca.contentmixMemes),
+        formatsFoto: migrateFormat(ca.formatsFoto),
+        formatsVideo: migrateFormat(ca.formatsVideo),
+        formatsReels: migrateFormat(ca.formatsReels),
+        formatsCarousels: migrateFormat(ca.formatsCarousels),
+        // Migrate renamed performance fields
+        gemiddeldeLikes: ca.gemiddeldeLikes || ca.performanceLikes || '',
+        gemiddeldeComments: ca.gemiddeldeComments || ca.performanceComments || '',
+        gemiddeldeShares: ca.gemiddeldeShares || ca.performanceShares || '',
+        gemiddeldeEngagementRate: ca.gemiddeldeEngagementRate || ca.performanceEngagementRate || '',
+      };
+
+      // Migrate concurrentieanalyse: flat object → array
+      let concurrentieanalyse;
+      if (Array.isArray(ext.concurrentieanalyse)) {
+        concurrentieanalyse = ext.concurrentieanalyse.map(c => ({ ...emptyCompetitor(), ...c }));
+      } else if (ext.concurrentieanalyse && typeof ext.concurrentieanalyse === 'object') {
+        concurrentieanalyse = [{ ...emptyCompetitor(), ...ext.concurrentieanalyse }];
+      } else {
+        concurrentieanalyse = [emptyCompetitor()];
+      }
+
+      return {
+        interneAnalyse: {
+          ...base.interneAnalyse,
+          ...int,
+          kanaalstrategie: { ...base.interneAnalyse.kanaalstrategie, ...(int.kanaalstrategie || {}) },
+          contentanalyse: migratedCa,
+        },
+        externeAnalyse: {
+          ...base.externeAnalyse,
+          ...ext,
+          concurrentieanalyse,
+          samenwerkingen: { ...base.externeAnalyse.samenwerkingen, ...(ext.samenwerkingen || {}) },
+        },
+      };
+    }
 
     function deepMerge(target, source) {
       if (!source || typeof source !== 'object') return target;
@@ -164,10 +228,10 @@
     // Performance metric cards + optional bars
     function PerformancePanel({ data }) {
       const metrics = [
-        { label: 'Likes',           value: data.performanceLikes },
-        { label: 'Comments',        value: data.performanceComments },
-        { label: 'Shares',          value: data.performanceShares },
-        { label: 'Engagement Rate', value: data.performanceEngagementRate },
+        { label: 'Gemiddelde likes',           value: data.gemiddeldeLikes },
+        { label: 'Gemiddelde comments',        value: data.gemiddeldeComments },
+        { label: 'Gemiddelde shares',          value: data.gemiddeldeShares },
+        { label: 'Gemiddelde engagement rate', value: data.gemiddeldeEngagementRate },
       ];
       const extractNum = str => { const m = str && str.match(/[\d,.]+/); return m ? parseFloat(m[0].replace(',', '.')) : null; };
       const nums = metrics.map(m => extractNum(m.value));
@@ -196,24 +260,92 @@
       );
     }
 
-    // Contentmix grid
-    function ContentmixGrid({ data }) {
-      const items = [
-        { label: 'Promo',            value: data.contentmixPromo },
-        { label: 'Behind the scenes', value: data.contentmixBehindScenes },
-        { label: 'Community',        value: data.contentmixCommunity },
-        { label: 'Storytelling',     value: data.contentmixStorytelling },
-        { label: 'Events',           value: data.contentmixEvents },
-        { label: 'Memes / cultuur',  value: data.contentmixMemes },
-      ];
+    // ─── Donut chart (SVG, no library) ────────────────────────────────────────
+    const CONTENTMIX_COLORS = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#f43f5e','#06b6d4'];
+    const CONTENTMIX_LABELS = ['Promo','Behind the scenes','Community','Storytelling','Events','Memes / cultuur'];
+
+    function DonutChart({ data }) {
+      const keys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
+      const counts = keys.map(k => Math.max(0, Number(data[k]) || 0));
+      const total = counts.reduce((a, b) => a + b, 0);
+
+      const R = 52, cx = 70, cy = 70;
+      const C = 2 * Math.PI * R;
+
+      if (total === 0) {
+        return (
+          <div className="flex flex-col items-center gap-4">
+            <svg width="140" height="140" viewBox="0 0 140 140">
+              <circle cx={cx} cy={cy} r={R} fill="none" stroke="#f3f4f6" strokeWidth="20" />
+              <text x={cx} y={cy + 5} textAnchor="middle" fill="#d1d5db" fontSize="11">Geen data</text>
+            </svg>
+            <p className="text-xs text-gray-300 italic">Vul aantallen in bij de contentmix</p>
+          </div>
+        );
+      }
+
+      let cumFrac = 0;
+      const arcs = counts.map((count, i) => {
+        const frac = count / total;
+        const dashLen = frac * C;
+        const gap = C - dashLen;
+        const offset = C * 0.25 - cumFrac * C; // rotate to start at top
+        cumFrac += frac;
+        return { frac, dashLen, gap, offset, color: CONTENTMIX_COLORS[i], label: CONTENTMIX_LABELS[i], count };
+      });
+
       return (
-        <div className="grid grid-cols-2 gap-2">
-          {items.map((item, i) => (
-            <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{item.label}</p>
-              <p className="text-sm text-gray-700 leading-relaxed">{item.value || <span className="text-gray-300 italic">—</span>}</p>
-            </div>
-          ))}
+        <div className="flex flex-col items-center gap-5">
+          <div className="relative">
+            <svg width="140" height="140" viewBox="0 0 140 140">
+              <circle cx={cx} cy={cy} r={R} fill="none" stroke="#f3f4f6" strokeWidth="20" />
+              {arcs.map((arc, i) => arc.count > 0 && (
+                <circle key={i}
+                  cx={cx} cy={cy} r={R}
+                  fill="none"
+                  stroke={arc.color}
+                  strokeWidth="20"
+                  strokeDasharray={`${arc.dashLen} ${arc.gap}`}
+                  strokeDashoffset={arc.offset}
+                  strokeLinecap="butt"
+                />
+              ))}
+              <text x={cx} y={cy - 6} textAnchor="middle" fill="#111827" fontSize="18" fontWeight="700">{total}</text>
+              <text x={cx} y={cy + 10} textAnchor="middle" fill="#9ca3af" fontSize="10">posts</text>
+            </svg>
+          </div>
+          <div className="w-full space-y-2">
+            {arcs.map((arc, i) => arc.count > 0 && (
+              <div key={i} className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: arc.color }} />
+                <span className="text-xs text-gray-600 flex-1 truncate">{arc.label}</span>
+                <span className="text-xs font-semibold text-gray-800">{arc.count}</span>
+                <span className="text-xs text-gray-400 w-9 text-right">{Math.round(arc.frac * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Format bar card (dashboard) ──────────────────────────────────────────
+    function FormatBarCard({ label, value, color }) {
+      const v = (value && typeof value === 'object') ? value : emptyFormat();
+      const pctStr = v.percentage || '';
+      const pctNum = Math.min(100, Math.max(0, parseFloat(pctStr.replace('%','').replace(',','.')) || 0));
+      const hasAny = pctNum > 0 || v.uitleg || v.voorbeelden;
+      return (
+        <div className="py-3 border-b border-gray-50 last:border-0">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-semibold text-gray-700">{label}</span>
+            <span className="text-xs font-bold text-gray-800">{pctNum > 0 ? `${pctNum}%` : '—'}</span>
+          </div>
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctNum}%`, backgroundColor: color }} />
+          </div>
+          {v.uitleg && <p className="text-xs text-gray-500 leading-relaxed mb-1">{v.uitleg}</p>}
+          {v.voorbeelden && <p className="text-xs text-gray-400 italic leading-relaxed">{v.voorbeelden}</p>}
+          {!hasAny && <p className="text-xs text-gray-300 italic">—</p>}
         </div>
       );
     }
@@ -282,55 +414,80 @@
       );
     }
 
+    function PageKanaalstrategie({ data }) {
+      return (
+        <div className="fade-in">
+          <DCard letter="C" title="Kanaalstrategie">
+            <DataRow label="Actieve platformen" value={data.actievePlatformen} />
+            <DataRow label="Strategische onderbouwing per platform" value={data.onderbouwingPerPlatform} />
+            <DataRow label="Primair kanaal" value={data.primairKanaal} />
+            <DataRow label="Ontbrekende kanalen" value={data.ontbrekendeKanalen} />
+          </DCard>
+        </div>
+      );
+    }
+
     function PageDoelgroep({ data }) {
       return (
         <div className="fade-in space-y-4">
-          <DCard letter="C" title="Doelgroep (huidige)">
+          <DCard letter="D" title="Doelgroep (huidige)">
             <DataRow label="Wie volgt het merk nu?" value={data.wieVolgt} />
             <DataRow label="Leeftijd / interesses" value={data.leeftijdInteresses} />
             <DataRow label="Gedrag" value={data.gedrag} />
             <DataRow label="Engagement" value={data.engagement} />
             <DataRow label="Community interactie" value={data.communityInteractie} />
           </DCard>
+          {/* Visuele vergelijking: gewenst vs werkelijk */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Gewenste doelgroep</p>
-              <p className="text-sm text-gray-800 leading-relaxed">{data.gewensteDoelgroep || <span className="text-gray-300 italic">—</span>}</p>
+            <div className="rounded-xl p-4 border-2 border-blue-100 bg-blue-50">
+              <div className="flex items-center gap-1.5 mb-3">
+                <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                <p className="text-xs font-bold text-blue-600 uppercase tracking-wide">Gewenst</p>
+              </div>
+              <p className="text-sm text-gray-800 leading-relaxed">
+                {data.gewensteDoelgroep || <span className="text-blue-200 italic">Niet ingevuld</span>}
+              </p>
             </div>
-            <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Werkelijke doelgroep</p>
-              <p className="text-sm text-gray-800 leading-relaxed">{data.werkelijkeDoelgroep || <span className="text-gray-300 italic">—</span>}</p>
+            <div className="rounded-xl p-4 border-2 border-amber-100 bg-amber-50">
+              <div className="flex items-center gap-1.5 mb-3">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                <p className="text-xs font-bold text-amber-600 uppercase tracking-wide">Werkelijk</p>
+              </div>
+              <p className="text-sm text-gray-800 leading-relaxed">
+                {data.werkelijkeDoelgroep || <span className="text-amber-200 italic">Niet ingevuld</span>}
+              </p>
             </div>
           </div>
+          {(data.gewensteDoelgroep || data.werkelijkeDoelgroep) && (
+            <p className="text-xs text-gray-400 text-center italic">
+              Blauw = wie je wil bereiken · Oranje = wie je nu bereikt
+            </p>
+          )}
         </div>
       );
     }
 
     function PageContentanalyse({ data }) {
+      const formatColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b'];
       return (
         <div className="fade-in space-y-4">
-          <DCard letter="D" title="Contentmix">
-            <ContentmixGrid data={data} />
+          <DCard letter="E" title="Contentmix">
+            <DonutChart data={data} />
           </DCard>
           <DCard title="Formats">
-            <div className="flex flex-wrap gap-2">
-              {[
-                { label: 'Foto',      value: data.formatsFoto },
-                { label: 'Video',     value: data.formatsVideo },
-                { label: 'Reels',     value: data.formatsReels },
-                { label: 'Carousels', value: data.formatsCarousels },
-              ].map((f, i) => (
-                <div key={i} className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 min-w-[120px] flex-1">
-                  <p className="text-xs text-gray-400 mb-1">{f.label}</p>
-                  <p className="text-sm text-gray-700">{f.value || <span className="text-gray-300 italic">—</span>}</p>
-                </div>
-              ))}
-            </div>
+            {[
+              { label: 'Foto',      value: data.formatsFoto,      color: formatColors[0] },
+              { label: 'Video',     value: data.formatsVideo,     color: formatColors[1] },
+              { label: 'Reels',     value: data.formatsReels,     color: formatColors[2] },
+              { label: 'Carousels', value: data.formatsCarousels, color: formatColors[3] },
+            ].map((f, i) => (
+              <FormatBarCard key={i} label={f.label} value={f.value} color={f.color} />
+            ))}
           </DCard>
           <DCard title="Frequentie">
             <p className="text-sm text-gray-800 leading-relaxed">{data.frequentie || <span className="text-gray-300 italic">—</span>}</p>
           </DCard>
-          <DCard title="Performance">
+          <DCard title="Performance (gemiddelden)">
             <PerformancePanel data={data} />
           </DCard>
         </div>
@@ -348,9 +505,54 @@
       ];
       return (
         <div className="fade-in">
-          <DCard letter="E" title="Strategische contentanalyse">
+          <DCard letter="G" title="Strategische contentanalyse">
             {items.map((item, i) => <DataRow key={i} label={item.label} value={item.value} />)}
           </DCard>
+        </div>
+      );
+    }
+
+    function CommunityMeter({ data }) {
+      // Score op basis van 4 velden: elk gevuld = +1, langere tekst = hoger
+      const scoreField = (v) => {
+        if (!v || !String(v).trim()) return 0;
+        const len = String(v).trim().length;
+        if (len < 20) return 0.5;
+        if (len < 80) return 1;
+        return 1.5;
+      };
+      const rawScore =
+        scoreField(data.interactieComments) +
+        scoreField(data.terugkerendeFans) +
+        scoreField(data.userGeneratedContent) +
+        scoreField(data.communityBetrokkenheid);
+      // max = 6, normalize to 0-100
+      const pct = Math.min(100, Math.round((rawScore / 6) * 100));
+      const label = pct < 25 ? 'Publiek' : pct < 50 ? 'Emerging community' : pct < 75 ? 'Actieve community' : 'Echte community';
+      const color = pct < 25 ? '#9ca3af' : pct < 50 ? '#f59e0b' : pct < 75 ? '#3b82f6' : '#10b981';
+
+      return (
+        <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Community score</p>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-gray-400">Publiek</span>
+            <span className="text-xs font-bold" style={{ color }}>{label}</span>
+            <span className="text-xs text-gray-400">Echte community</span>
+          </div>
+          <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="absolute inset-y-0 left-0 rounded-full transition-all duration-700"
+              style={{ width: `${pct}%`, backgroundColor: color }}
+            />
+          </div>
+          <div className="flex justify-between mt-1">
+            <span className="text-xs text-gray-300">0</span>
+            <span className="text-xs font-semibold text-gray-600">{pct}%</span>
+            <span className="text-xs text-gray-300">100</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-3 italic">
+            Score gebaseerd op: interactie in comments, terugkerende fans, user generated content en community betrokkenheid.
+          </p>
         </div>
       );
     }
@@ -358,7 +560,7 @@
     function PageCommunity({ data }) {
       return (
         <div className="fade-in space-y-4">
-          <DCard letter="F" title="Community analyse">
+          <DCard letter="H" title="Community analyse">
             <DataRow label="Interactie in comments" value={data.interactieComments} />
             <DataRow label="DM interacties" value={data.dmInteracties} />
           </DCard>
@@ -375,6 +577,7 @@
               {data.publiefOfCommunity || <span className="text-gray-300 italic">—</span>}
             </p>
           </DCard>
+          <CommunityMeter data={data} />
         </div>
       );
     }
@@ -382,7 +585,7 @@
     function PageMiddelen({ data }) {
       return (
         <div className="fade-in">
-          <DCard letter="G" title="Middelen (resources)">
+          <DCard letter="I" title="Middelen (resources)">
             <MiddelenGrid data={data} />
           </DCard>
         </div>
@@ -393,7 +596,7 @@
       return (
         <div className="fade-in">
           <div className="mb-4 flex items-baseline gap-2">
-            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">H</span>
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">J</span>
             <h4 className="text-sm font-semibold text-gray-800">SWOT analyse</h4>
           </div>
           <SwotBlock swot={data} />
@@ -402,20 +605,66 @@
     }
 
     function PageConcurrentie({ data }) {
+      const list = Array.isArray(data) ? data : [data];
+      const rows = [
+        { key: 'positionering', label: 'Positionering' },
+        { key: 'branding',      label: 'Branding' },
+        { key: 'content',       label: 'Content' },
+        { key: 'community',     label: 'Community' },
+        { key: 'engagement',    label: 'Engagement' },
+        { key: 'differentiatie',label: 'Differentiatie' },
+        { key: 'watDoenZijNiet',label: 'Wat doen zij NIET?' },
+      ];
+      const colW = Math.max(180, Math.floor(280 / list.length));
       return (
         <div className="fade-in">
-          <DCard letter="A" title="Concurrentieanalyse">
-            <DataRow label="Positionering" value={data.positionering} />
-            <DataRow label="Branding" value={data.branding} />
-            <DataRow label="Content" value={data.content} />
-            <DataRow label="Community" value={data.community} />
-            <DataRow label="Engagement" value={data.engagement} />
-            <DataRow label="Differentiatie" value={data.differentiatie} />
-          </DCard>
-          <DCard title="Wat doen zij NIET?">
-            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-              {data.watDoenZijNiet || <span className="text-gray-300 italic">—</span>}
-            </p>
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">A</span>
+            <h4 className="text-sm font-semibold text-gray-800">Concurrentieanalyse</h4>
+          </div>
+          <div className="overflow-x-auto -mx-4 px-4">
+            <table className="w-full border-collapse" style={{ minWidth: `${140 + list.length * colW}px` }}>
+              <thead>
+                <tr>
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide py-2 pr-3 w-32 sticky left-0 bg-gray-50 z-10" />
+                  {list.map((c, i) => (
+                    <th key={i} className="text-left text-xs font-bold text-gray-800 py-2 px-3 border-l border-gray-100 bg-white" style={{ minWidth: colW }}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CONTENTMIX_COLORS[i % CONTENTMIX_COLORS.length] }} />
+                        {c.naam || `Concurrent ${i + 1}`}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, ri) => (
+                  <tr key={row.key} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="text-xs font-semibold text-gray-500 py-3 pr-3 align-top sticky left-0 z-10 border-r border-gray-100" style={{ backgroundColor: 'inherit' }}>
+                      {row.label}
+                    </td>
+                    {list.map((c, i) => (
+                      <td key={i} className="text-xs text-gray-700 py-3 px-3 align-top border-l border-gray-100 leading-relaxed whitespace-pre-wrap">
+                        {c[row.key] || <span className="text-gray-300 italic">—</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    function PageSamenwerkingen({ data }) {
+      return (
+        <div className="fade-in">
+          <DCard letter="B" title="Samenwerkingen en netwerk">
+            <DataRow label="Potentiële partners" value={data.potentielePartners} />
+            <DataRow label="Gatekeepers in de scene" value={data.gatekeepers} />
+            <DataRow label="Bestaande samenwerkingen en resultaten" value={data.bestaandeSamenwerkingen} />
+            <DataRow label="Ontbrekende samenwerkingen" value={data.ontbrekendeSamenwerkingen} />
           </DCard>
         </div>
       );
@@ -424,7 +673,7 @@
     function PageMarkt({ data }) {
       return (
         <div className="fade-in">
-          <DCard letter="B" title="Markt / scene analyse">
+          <DCard letter="C" title="Markt / scene analyse">
             <DataRow label="Grootte van de scene" value={data.grootteScene} />
             <DataRow label="Populariteit van het genre" value={data.populariteitGenre} />
             <DataRow label="Aantal events" value={data.aantalEvents} />
@@ -438,7 +687,7 @@
     function PageDoelgroepgedrag({ data }) {
       return (
         <div className="fade-in">
-          <DCard letter="C" title="Doelgroepgedrag">
+          <DCard letter="D" title="Doelgroepgedrag">
             <DataRow label="Hoe ontdekken ze muziek?" value={data.ontdekkingMuziek} />
             <DataRow label="Welke platformen gebruiken ze?" value={data.platformgebruik} />
             <DataRow label="Wat motiveert hen?" value={data.motivatie} />
@@ -457,60 +706,33 @@
       ];
       return (
         <div className="fade-in">
-          <DCard letter="D" title="Culturele trends">
+          <DCard letter="E" title="Culturele trends">
             {items.map((item, i) => <DataRow key={i} label={item.label} value={item.value} />)}
           </DCard>
         </div>
       );
     }
 
-    function PagePlatformen({ data }) {
-      const platforms = [
-        { label: 'Instagram', sub: 'Reach',           value: data.instagramReach,          icon: '📸' },
-        { label: 'TikTok',    sub: 'Discoverability', value: data.tiktokDiscoverability,    icon: '🎵' },
-        { label: 'Spotify',   sub: 'Algoritmes',      value: data.spotifyAlgoritmes,        icon: '🎧' },
-        { label: 'YouTube',   sub: 'Cultuur',         value: data.youtubeCultuur,           icon: '▶️' },
-      ];
-      return (
-        <div className="fade-in space-y-3">
-          <div className="flex items-baseline gap-2 mb-4">
-            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">E</span>
-            <h4 className="text-sm font-semibold text-gray-800">Platform analyse</h4>
-          </div>
-          {platforms.map((p, i) => (
-            <div key={i} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-base">{p.icon}</span>
-                <p className="text-sm font-semibold text-gray-800">{p.label}</p>
-                <span className="text-xs text-gray-400">{p.sub}</span>
-              </div>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                {p.value || <span className="text-gray-300 italic">—</span>}
-              </p>
-            </div>
-          ))}
-        </div>
-      );
-    }
 
-    // ─── Dashboard Screen ─────────────────────────────────────────────────────
+// ─── Dashboard Screen ─────────────────────────────────────────────────────
     const INTERNE_TABS = [
       { id: 'organisatie',     label: 'Organisatie',    letter: 'A' },
       { id: 'merkidentiteit',  label: 'Merkidentiteit', letter: 'B' },
-      { id: 'doelgroep',       label: 'Doelgroep',      letter: 'C' },
-      { id: 'contentanalyse',  label: 'Content',        letter: 'D' },
-      { id: 'strategisch',     label: 'Strategie',      letter: 'E' },
-      { id: 'community',       label: 'Community',      letter: 'F' },
-      { id: 'middelen',        label: 'Middelen',        letter: 'G' },
-      { id: 'swot',            label: 'SWOT',           letter: 'H' },
+      { id: 'kanaalstrategie', label: 'Kanalen',        letter: 'C' },
+      { id: 'doelgroep',       label: 'Doelgroep',      letter: 'D' },
+      { id: 'contentanalyse',  label: 'Content',        letter: 'E' },
+      { id: 'strategisch',     label: 'Strategie',      letter: 'G' },
+      { id: 'community',       label: 'Community',      letter: 'H' },
+      { id: 'middelen',        label: 'Middelen',       letter: 'I' },
+      { id: 'swot',            label: 'SWOT',           letter: 'J' },
     ];
 
     const EXTERNE_TABS = [
       { id: 'concurrentie',    label: 'Concurrentie',   letter: 'A' },
-      { id: 'markt',           label: 'Markt / Scene',  letter: 'B' },
-      { id: 'doelgroepgedrag', label: 'Doelgroepgedrag', letter: 'C' },
-      { id: 'trends',          label: 'Trends',         letter: 'D' },
-      { id: 'platformen',      label: 'Platformen',     letter: 'E' },
+      { id: 'samenwerkingen',  label: 'Samenwerkingen', letter: 'B' },
+      { id: 'markt',           label: 'Markt / Scene',  letter: 'C' },
+      { id: 'doelgroepgedrag', label: 'Doelgroepgedrag', letter: 'D' },
+      { id: 'trends',          label: 'Trends',         letter: 'E' },
     ];
 
     function SubTabBar({ tabs, active, onChange }) {
@@ -550,25 +772,26 @@
 
       const renderInternePage = () => {
         switch (interneTab) {
-          case 'organisatie':    return <PageOrganisatie data={int.organisatie} />;
-          case 'merkidentiteit': return <PageMerkidentiteit data={int.merkidentiteit} />;
-          case 'doelgroep':      return <PageDoelgroep data={int.doelgroep} />;
-          case 'contentanalyse': return <PageContentanalyse data={int.contentanalyse} />;
-          case 'strategisch':    return <PageStrategischeContent data={int.strategischeContent} />;
-          case 'community':      return <PageCommunity data={int.communityAnalyse} />;
-          case 'middelen':       return <PageMiddelen data={int.middelen} />;
-          case 'swot':           return <PageSwot data={int.swot} />;
-          default:               return null;
+          case 'organisatie':     return <PageOrganisatie data={int.organisatie} />;
+          case 'merkidentiteit':  return <PageMerkidentiteit data={int.merkidentiteit} />;
+          case 'kanaalstrategie': return <PageKanaalstrategie data={int.kanaalstrategie || {}} />;
+          case 'doelgroep':       return <PageDoelgroep data={int.doelgroep} />;
+          case 'contentanalyse':  return <PageContentanalyse data={int.contentanalyse} />;
+          case 'strategisch':     return <PageStrategischeContent data={int.strategischeContent} />;
+          case 'community':       return <PageCommunity data={int.communityAnalyse} />;
+          case 'middelen':        return <PageMiddelen data={int.middelen} />;
+          case 'swot':            return <PageSwot data={int.swot} />;
+          default:                return null;
         }
       };
 
       const renderExternePage = () => {
         switch (externeTab) {
           case 'concurrentie':    return <PageConcurrentie data={ext.concurrentieanalyse} />;
+          case 'samenwerkingen':  return <PageSamenwerkingen data={ext.samenwerkingen || {}} />;
           case 'markt':           return <PageMarkt data={ext.marktSceneAnalyse} />;
           case 'doelgroepgedrag': return <PageDoelgroepgedrag data={ext.doelgroepgedrag} />;
           case 'trends':          return <PageCultureleTrends data={ext.cultureleTrends} />;
-          case 'platformen':      return <PagePlatformen data={ext.platformAnalyse} />;
           default:                return null;
         }
       };
@@ -681,6 +904,45 @@
       );
     }
 
+    // ─── Format field (3 sub-fields per format) ───────────────────────────────
+    function FormatField({ label, value, onChange }) {
+      const v = (value && typeof value === 'object') ? value : emptyFormat();
+      const set = (key, val) => onChange({ ...v, [key]: val });
+      return (
+        <div className="mb-4 border border-gray-100 rounded-xl p-4 bg-gray-50">
+          <p className="text-sm font-semibold text-gray-700 mb-3">{label}</p>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Percentage van totale content</label>
+            <input
+              type="text"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+              placeholder="bijv. 40%"
+              value={v.percentage}
+              onChange={e => set('percentage', e.target.value)}
+            />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Hoe wordt dit format gebruikt?</label>
+            <textarea
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+              rows={2}
+              value={v.uitleg}
+              onChange={e => set('uitleg', e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Voorbeeldcontent (omschrijving of URL)</label>
+            <textarea
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+              rows={2}
+              value={v.voorbeelden}
+              onChange={e => set('voorbeelden', e.target.value)}
+            />
+          </div>
+        </div>
+      );
+    }
+
     // ─── Step 1: Interne Analyse form ─────────────────────────────────────────
     function InterneAnalyseForm({ data, onChange }) {
       const s = (section, key, val) => onChange({ ...data, [section]: { ...data[section], [key]: val } });
@@ -700,7 +962,13 @@
             <Field label="Waarden en missie" value={data.merkidentiteit.waardenMissie} onChange={v => s('merkidentiteit','waardenMissie',v)} rows={3} />
             <Field label="Huidige positionering" hint="Wat probeert dit merk te zijn?" value={data.merkidentiteit.huidigePositionering} onChange={v => s('merkidentiteit','huidigePositionering',v)} rows={3} />
           </SubSection>
-          <SubSection letter="C" title="Doelgroep (huidige)">
+          <SubSection letter="C" title="Kanaalstrategie" subtitle="Op welke kanalen is het merk actief en waarom?">
+            <Field label="Actieve platformen" hint="Welke sociale media / kanalen gebruikt het merk?" value={data.kanaalstrategie.actievePlatformen} onChange={v => s('kanaalstrategie','actievePlatformen',v)} rows={2} />
+            <Field label="Strategische onderbouwing per platform" hint="Waarom wordt elk platform ingezet? Wat is het doel?" value={data.kanaalstrategie.onderbouwingPerPlatform} onChange={v => s('kanaalstrategie','onderbouwingPerPlatform',v)} rows={4} />
+            <Field label="Primair kanaal" hint="Waar zit de meeste focus en energie?" value={data.kanaalstrategie.primairKanaal} onChange={v => s('kanaalstrategie','primairKanaal',v)} rows={2} />
+            <Field label="Ontbrekende kanalen" hint="Welke kanalen worden niet gebruikt maar zijn wel relevant?" value={data.kanaalstrategie.ontbrekendeKanalen} onChange={v => s('kanaalstrategie','ontbrekendeKanalen',v)} rows={2} />
+          </SubSection>
+          <SubSection letter="D" title="Doelgroep (huidige)">
             <Field label="Wie volgt het merk nu?" value={data.doelgroep.wieVolgt} onChange={v => s('doelgroep','wieVolgt',v)} rows={2} />
             <Field label="Leeftijd / interesses" value={data.doelgroep.leeftijdInteresses} onChange={v => s('doelgroep','leeftijdInteresses',v)} rows={2} />
             <Field label="Gedrag" value={data.doelgroep.gedrag} onChange={v => s('doelgroep','gedrag',v)} rows={2} />
@@ -709,28 +977,70 @@
             <Field label="Gewenste doelgroep" value={data.doelgroep.gewensteDoelgroep} onChange={v => s('doelgroep','gewensteDoelgroep',v)} rows={2} />
             <Field label="Werkelijke doelgroep" value={data.doelgroep.werkelijkeDoelgroep} onChange={v => s('doelgroep','werkelijkeDoelgroep',v)} rows={2} />
           </SubSection>
-          <SubSection letter="D" title="Contentanalyse" subtitle="Analyse van bestaande content.">
+          <SubSection letter="E" title="Contentanalyse" subtitle="Analyse van bestaande content.">
             <GroupLabel label="Contentmix" />
-            <Field label="Promo" value={data.contentanalyse.contentmixPromo} onChange={v => s('contentanalyse','contentmixPromo',v)} rows={2} />
-            <Field label="Behind the scenes" value={data.contentanalyse.contentmixBehindScenes} onChange={v => s('contentanalyse','contentmixBehindScenes',v)} rows={2} />
-            <Field label="Community" value={data.contentanalyse.contentmixCommunity} onChange={v => s('contentanalyse','contentmixCommunity',v)} rows={2} />
-            <Field label="Storytelling" value={data.contentanalyse.contentmixStorytelling} onChange={v => s('contentanalyse','contentmixStorytelling',v)} rows={2} />
-            <Field label="Events" value={data.contentanalyse.contentmixEvents} onChange={v => s('contentanalyse','contentmixEvents',v)} rows={2} />
-            <Field label="Memes / cultuur" value={data.contentanalyse.contentmixMemes} onChange={v => s('contentanalyse','contentmixMemes',v)} rows={2} />
+            {(() => {
+              const ca = data.contentanalyse;
+              const sc = (key, val) => s('contentanalyse', key, val);
+              const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
+              const mixLabels = ['Promo','Behind the scenes','Community','Storytelling','Events','Memes / cultuur'];
+              const werkelijkTotaal = mixKeys.reduce((sum, k) => sum + (Number(ca[k]) || 0), 0);
+              return (
+                <div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Aantal geanalyseerde posts</label>
+                    <select
+                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                      value={ca.contentmixTotaal}
+                      onChange={e => sc('contentmixTotaal', Number(e.target.value))}
+                    >
+                      {[10, 20, 30, 50].map(n => <option key={n} value={n}>{n} posts</option>)}
+                    </select>
+                    {werkelijkTotaal > 0 && werkelijkTotaal !== ca.contentmixTotaal && (
+                      <p className="text-xs text-amber-500 mt-1">Totaal van ingevulde aantallen: {werkelijkTotaal} (wordt gebruikt voor percentages)</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {mixKeys.map((key, i) => {
+                      const count = Number(ca[key]) || 0;
+                      const pct = werkelijkTotaal > 0 ? Math.round((count / werkelijkTotaal) * 100) : 0;
+                      return (
+                        <div key={key} className="flex items-center gap-3">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CONTENTMIX_COLORS[i] }} />
+                          <label className="text-sm text-gray-700 flex-1">{mixLabels[i]}</label>
+                          <input
+                            type="number"
+                            min="0"
+                            className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition text-center"
+                            value={count === 0 ? '' : count}
+                            placeholder="0"
+                            onChange={e => sc(key, Math.max(0, parseInt(e.target.value) || 0))}
+                          />
+                          <span className="text-xs text-gray-400 w-9 text-right">{pct > 0 ? `${pct}%` : '—'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {werkelijkTotaal > 0 && (
+                    <p className="text-xs text-gray-400 mt-3">Totaal: {werkelijkTotaal} posts</p>
+                  )}
+                </div>
+              );
+            })()}
             <GroupLabel label="Formats" />
-            <Field label="Foto" value={data.contentanalyse.formatsFoto} onChange={v => s('contentanalyse','formatsFoto',v)} rows={2} />
-            <Field label="Video" value={data.contentanalyse.formatsVideo} onChange={v => s('contentanalyse','formatsVideo',v)} rows={2} />
-            <Field label="Reels" value={data.contentanalyse.formatsReels} onChange={v => s('contentanalyse','formatsReels',v)} rows={2} />
-            <Field label="Carousels" value={data.contentanalyse.formatsCarousels} onChange={v => s('contentanalyse','formatsCarousels',v)} rows={2} />
+            <FormatField label="Foto" value={data.contentanalyse.formatsFoto} onChange={v => s('contentanalyse','formatsFoto',v)} />
+            <FormatField label="Video" value={data.contentanalyse.formatsVideo} onChange={v => s('contentanalyse','formatsVideo',v)} />
+            <FormatField label="Reels" value={data.contentanalyse.formatsReels} onChange={v => s('contentanalyse','formatsReels',v)} />
+            <FormatField label="Carousels" value={data.contentanalyse.formatsCarousels} onChange={v => s('contentanalyse','formatsCarousels',v)} />
             <GroupLabel label="Frequentie" />
             <Field label="Hoe vaak wordt er gepost?" value={data.contentanalyse.frequentie} onChange={v => s('contentanalyse','frequentie',v)} rows={2} />
-            <GroupLabel label="Performance" />
-            <Field label="Likes" value={data.contentanalyse.performanceLikes} onChange={v => s('contentanalyse','performanceLikes',v)} rows={2} />
-            <Field label="Comments" value={data.contentanalyse.performanceComments} onChange={v => s('contentanalyse','performanceComments',v)} rows={2} />
-            <Field label="Shares" value={data.contentanalyse.performanceShares} onChange={v => s('contentanalyse','performanceShares',v)} rows={2} />
-            <Field label="Engagement rate" value={data.contentanalyse.performanceEngagementRate} onChange={v => s('contentanalyse','performanceEngagementRate',v)} rows={2} />
+            <GroupLabel label="Performance (gemiddelden)" />
+            <Field label="Gemiddelde likes" value={data.contentanalyse.gemiddeldeLikes} onChange={v => s('contentanalyse','gemiddeldeLikes',v)} rows={2} />
+            <Field label="Gemiddelde comments" value={data.contentanalyse.gemiddeldeComments} onChange={v => s('contentanalyse','gemiddeldeComments',v)} rows={2} />
+            <Field label="Gemiddelde shares" value={data.contentanalyse.gemiddeldeShares} onChange={v => s('contentanalyse','gemiddeldeShares',v)} rows={2} />
+            <Field label="Gemiddelde engagement rate" value={data.contentanalyse.gemiddeldeEngagementRate} onChange={v => s('contentanalyse','gemiddeldeEngagementRate',v)} rows={2} />
           </SubSection>
-          <SubSection letter="E" title="Strategische contentanalyse" subtitle="Niet alleen cijfers, maar ook inhoud.">
+          <SubSection letter="G" title="Strategische contentanalyse" subtitle="Niet alleen cijfers, maar ook inhoud.">
             <Field label="Positioneringsconsistentie" value={data.strategischeContent.positioneringsconsistentie} onChange={v => s('strategischeContent','positioneringsconsistentie',v)} rows={3} />
             <Field label="Tone of voice" value={data.strategischeContent.toneOfVoice} onChange={v => s('strategischeContent','toneOfVoice',v)} rows={3} />
             <Field label="Storytelling" value={data.strategischeContent.storytelling} onChange={v => s('strategischeContent','storytelling',v)} rows={3} />
@@ -738,7 +1048,7 @@
             <Field label="Doelgroepresonantie" value={data.strategischeContent.doelgroepresonantie} onChange={v => s('strategischeContent','doelgroepresonantie',v)} rows={3} />
             <Field label="Formatstrategie" value={data.strategischeContent.formatstrategie} onChange={v => s('strategischeContent','formatstrategie',v)} rows={3} />
           </SubSection>
-          <SubSection letter="F" title="Community analyse">
+          <SubSection letter="H" title="Community analyse">
             <Field label="Interactie in comments" value={data.communityAnalyse.interactieComments} onChange={v => s('communityAnalyse','interactieComments',v)} rows={2} />
             <Field label="Terugkerende fans" value={data.communityAnalyse.terugkerendeFans} onChange={v => s('communityAnalyse','terugkerendeFans',v)} rows={2} />
             <Field label="User generated content" value={data.communityAnalyse.userGeneratedContent} onChange={v => s('communityAnalyse','userGeneratedContent',v)} rows={2} />
@@ -746,14 +1056,14 @@
             <Field label="Community betrokkenheid" value={data.communityAnalyse.communityBetrokkenheid} onChange={v => s('communityAnalyse','communityBetrokkenheid',v)} rows={2} />
             <Field label="Is dit een publiek of een echte community?" hint="Onderbouw je antwoord." value={data.communityAnalyse.publiefOfCommunity} onChange={v => s('communityAnalyse','publiefOfCommunity',v)} rows={4} />
           </SubSection>
-          <SubSection letter="G" title="Middelen (resources)" subtitle="Dit bepaalt wat realistisch is.">
+          <SubSection letter="I" title="Middelen (resources)" subtitle="Dit bepaalt wat realistisch is.">
             <Field label="Budget" value={data.middelen.budget} onChange={v => s('middelen','budget',v)} rows={2} />
             <Field label="Tijd" value={data.middelen.tijd} onChange={v => s('middelen','tijd',v)} rows={2} />
             <Field label="Team" value={data.middelen.team} onChange={v => s('middelen','team',v)} rows={2} />
             <Field label="Netwerk" value={data.middelen.netwerk} onChange={v => s('middelen','netwerk',v)} rows={2} />
             <Field label="Skills (design, video, etc.)" value={data.middelen.skills} onChange={v => s('middelen','skills',v)} rows={2} />
           </SubSection>
-          <SubSection letter="H" title="SWOT analyse" subtitle="Pas nadat je alles onderzocht hebt.">
+          <SubSection letter="J" title="SWOT analyse" subtitle="Pas nadat je alles onderzocht hebt.">
             <Field label="Strengths — sterktes van het merk" value={data.swot.strengths} onChange={v => s('swot','strengths',v)} rows={4} />
             <Field label="Weaknesses — interne zwaktes" value={data.swot.weaknesses} onChange={v => s('swot','weaknesses',v)} rows={4} />
             <Field label="Opportunities — externe kansen" value={data.swot.opportunities} onChange={v => s('swot','opportunities',v)} rows={4} />
@@ -766,41 +1076,82 @@
     // ─── Step 2: Externe Analyse form ─────────────────────────────────────────
     function ExterneAnalyseForm({ data, onChange }) {
       const s = (section, key, val) => onChange({ ...data, [section]: { ...data[section], [key]: val } });
+
+      const concurrenten = Array.isArray(data.concurrentieanalyse) ? data.concurrentieanalyse : [emptyCompetitor()];
+      const setConcurrent = (i, key, val) => {
+        const updated = concurrenten.map((c, idx) => idx === i ? { ...c, [key]: val } : c);
+        onChange({ ...data, concurrentieanalyse: updated });
+      };
+      const addConcurrent = () => {
+        if (concurrenten.length >= 5) return;
+        onChange({ ...data, concurrentieanalyse: [...concurrenten, emptyCompetitor()] });
+      };
+      const removeConcurrent = (i) => {
+        if (concurrenten.length <= 1) return;
+        onChange({ ...data, concurrentieanalyse: concurrenten.filter((_, idx) => idx !== i) });
+      };
+
       return (
         <div className="fade-in">
-          <SubSection letter="A" title="Concurrentieanalyse" subtitle="Analyseer 3–5 concurrenten.">
-            <Field label="Positionering" value={data.concurrentieanalyse.positionering} onChange={v => s('concurrentieanalyse','positionering',v)} rows={3} />
-            <Field label="Branding" value={data.concurrentieanalyse.branding} onChange={v => s('concurrentieanalyse','branding',v)} rows={3} />
-            <Field label="Content" value={data.concurrentieanalyse.content} onChange={v => s('concurrentieanalyse','content',v)} rows={3} />
-            <Field label="Community" value={data.concurrentieanalyse.community} onChange={v => s('concurrentieanalyse','community',v)} rows={3} />
-            <Field label="Engagement" value={data.concurrentieanalyse.engagement} onChange={v => s('concurrentieanalyse','engagement',v)} rows={3} />
-            <Field label="Differentiatie" value={data.concurrentieanalyse.differentiatie} onChange={v => s('concurrentieanalyse','differentiatie',v)} rows={3} />
-            <Field label="Wat doen zij NIET?" hint="Daar zit vaak jouw kans." value={data.concurrentieanalyse.watDoenZijNiet} onChange={v => s('concurrentieanalyse','watDoenZijNiet',v)} rows={4} />
+          <SubSection letter="A" title="Concurrentieanalyse" subtitle="Voeg tot 5 concurrenten toe.">
+            {concurrenten.map((c, i) => (
+              <div key={i} className="mb-6 border border-gray-100 rounded-xl p-4 bg-white">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Concurrent {i + 1}</p>
+                  {concurrenten.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeConcurrent(i)}
+                      className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      Verwijder
+                    </button>
+                  )}
+                </div>
+                <Field label="Naam concurrent" value={c.naam} onChange={v => setConcurrent(i,'naam',v)} rows={1} />
+                <Field label="Positionering" value={c.positionering} onChange={v => setConcurrent(i,'positionering',v)} rows={3} />
+                <Field label="Branding" value={c.branding} onChange={v => setConcurrent(i,'branding',v)} rows={3} />
+                <Field label="Content" value={c.content} onChange={v => setConcurrent(i,'content',v)} rows={3} />
+                <Field label="Community" value={c.community} onChange={v => setConcurrent(i,'community',v)} rows={3} />
+                <Field label="Engagement" value={c.engagement} onChange={v => setConcurrent(i,'engagement',v)} rows={3} />
+                <Field label="Differentiatie" value={c.differentiatie} onChange={v => setConcurrent(i,'differentiatie',v)} rows={3} />
+                <Field label="Wat doen zij NIET?" hint="Daar zit vaak jouw kans." value={c.watDoenZijNiet} onChange={v => setConcurrent(i,'watDoenZijNiet',v)} rows={3} />
+              </div>
+            ))}
+            {concurrenten.length < 5 && (
+              <button
+                type="button"
+                onClick={addConcurrent}
+                className="w-full border border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors"
+              >
+                + Voeg concurrent toe
+              </button>
+            )}
           </SubSection>
-          <SubSection letter="B" title="Markt / scene analyse">
+          <SubSection letter="B" title="Samenwerkingen en netwerk" subtitle="Wie zijn de sleutelfiguren en partners?">
+            <Field label="Potentiële partners" hint="Artiesten, labels, merken, media…" value={data.samenwerkingen.potentielePartners} onChange={v => s('samenwerkingen','potentielePartners',v)} rows={3} />
+            <Field label="Gatekeepers in de scene" hint="Bloggers, curatoren, booking agents, promotors…" value={data.samenwerkingen.gatekeepers} onChange={v => s('samenwerkingen','gatekeepers',v)} rows={3} />
+            <Field label="Bestaande samenwerkingen en resultaten" value={data.samenwerkingen.bestaandeSamenwerkingen} onChange={v => s('samenwerkingen','bestaandeSamenwerkingen',v)} rows={4} />
+            <Field label="Ontbrekende samenwerkingen" hint="Welke connecties ontbreken nog?" value={data.samenwerkingen.ontbrekendeSamenwerkingen} onChange={v => s('samenwerkingen','ontbrekendeSamenwerkingen',v)} rows={3} />
+          </SubSection>
+          <SubSection letter="C" title="Markt / scene analyse">
             <Field label="Grootte van de scene" value={data.marktSceneAnalyse.grootteScene} onChange={v => s('marktSceneAnalyse','grootteScene',v)} rows={2} />
             <Field label="Populariteit van het genre" value={data.marktSceneAnalyse.populariteitGenre} onChange={v => s('marktSceneAnalyse','populariteitGenre',v)} rows={2} />
             <Field label="Aantal events" value={data.marktSceneAnalyse.aantalEvents} onChange={v => s('marktSceneAnalyse','aantalEvents',v)} rows={2} />
             <Field label="Andere labels / collectieven" value={data.marktSceneAnalyse.andereLabels} onChange={v => s('marktSceneAnalyse','andereLabels',v)} rows={2} />
             <Field label="Marktverzadiging" value={data.marktSceneAnalyse.marktverzadiging} onChange={v => s('marktSceneAnalyse','marktverzadiging',v)} rows={2} />
           </SubSection>
-          <SubSection letter="C" title="Doelgroepgedrag" subtitle="Niet alleen wie ze zijn, maar hoe ze handelen.">
+          <SubSection letter="D" title="Doelgroepgedrag" subtitle="Niet alleen wie ze zijn, maar hoe ze handelen.">
             <Field label="Hoe ontdekken ze muziek?" value={data.doelgroepgedrag.ontdekkingMuziek} onChange={v => s('doelgroepgedrag','ontdekkingMuziek',v)} rows={3} />
             <Field label="Welke platformen gebruiken ze?" value={data.doelgroepgedrag.platformgebruik} onChange={v => s('doelgroepgedrag','platformgebruik',v)} rows={3} />
             <Field label="Wat motiveert hen?" value={data.doelgroepgedrag.motivatie} onChange={v => s('doelgroepgedrag','motivatie',v)} rows={3} />
             <Field label="Wie beïnvloedt hen?" value={data.doelgroepgedrag.invloeden} onChange={v => s('doelgroepgedrag','invloeden',v)} rows={3} />
           </SubSection>
-          <SubSection letter="D" title="Culturele trends" subtitle="Voor muzieklabels zeer belangrijk.">
+          <SubSection letter="E" title="Culturele trends" subtitle="Voor muzieklabels zeer belangrijk.">
             <Field label="Stijgende populariteit van een genre" value={data.cultureleTrends.genrePopulariteit} onChange={v => s('cultureleTrends','genrePopulariteit',v)} rows={3} />
             <Field label="Nostalgie trends" value={data.cultureleTrends.nostalgieTrends} onChange={v => s('cultureleTrends','nostalgieTrends',v)} rows={3} />
             <Field label="DIY cultuur" value={data.cultureleTrends.diyCultuur} onChange={v => s('cultureleTrends','diyCultuur',v)} rows={3} />
             <Field label="Authenticiteit vs commercialisering" value={data.cultureleTrends.authenticiteitVsCommercialisering} onChange={v => s('cultureleTrends','authenticiteitVsCommercialisering',v)} rows={3} />
-          </SubSection>
-          <SubSection letter="E" title="Platform analyse" subtitle="Hoe functioneren de platformen?">
-            <Field label="Instagram reach" value={data.platformAnalyse.instagramReach} onChange={v => s('platformAnalyse','instagramReach',v)} rows={3} />
-            <Field label="TikTok discoverability" value={data.platformAnalyse.tiktokDiscoverability} onChange={v => s('platformAnalyse','tiktokDiscoverability',v)} rows={3} />
-            <Field label="Spotify algoritmes" value={data.platformAnalyse.spotifyAlgoritmes} onChange={v => s('platformAnalyse','spotifyAlgoritmes',v)} rows={3} />
-            <Field label="YouTube cultuur" value={data.platformAnalyse.youtubeCultuur} onChange={v => s('platformAnalyse','youtubeCultuur',v)} rows={3} />
           </SubSection>
         </div>
       );
@@ -812,12 +1163,8 @@
       const [step, setStep] = useState(1);
       const [klantnaam, setKlantnaam] = useState(initial?.klantnaam || '');
       const [data, setData] = useState(() => {
-        const base = emptyData();
-        if (!initial) return base;
-        return {
-          interneAnalyse: deepMerge(base.interneAnalyse, initial.interneAnalyse),
-          externeAnalyse: deepMerge(base.externeAnalyse, initial.externeAnalyse),
-        };
+        if (!initial) return emptyData();
+        return migrateAnalysis(initial);
       });
 
       const top = () => window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1024,7 +1371,8 @@
       const handleImport = (raw) => {
         const items = Array.isArray(raw) ? raw : [raw];
         const newItems = items.map(d => ({
-          ...d, id: generateId(),
+          ...migrateAnalysis(d),
+          id: generateId(),
           datum: d.datum || new Date().toISOString(),
           klantnaam: d.klantnaam || 'Geïmporteerd',
         }));
