@@ -2,55 +2,30 @@
 
 ## Laatste opslag
 **Datum:** 2026-03-19
-**Commit hash:** `(zie git log)`
+**Commit hash:** `d56e7a0` *(zie ook: efddfbb)*
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
 
 ---
 
-## Samenvatting wijzigingen (commit 8a2002e)
+## Samenvatting recente wijzigingen
 
-### Dashboardvisualisatie
-1. **IconDataCard** — Alle tekstvelden in afgebakende kaartjes met passend icoon per veld
-2. **Badge-detectie** — Automatische gekleurde badge op sleutelwoorden: sterk/consistent/goed/hoog → groen · matig/gemengd/beperkt → oranje · zwak/inconsistent/laag/geen → rood
-3. **Sectie-achtergronden** — Subtiele achtergrondkleuren per sectie (slate/violet/blue/amber/teal/emerald/purple/orange/sky/rose)
-4. **Tag-lijstvelden** — Actieve platformen, teamleden, gatekeepers, potentiële partners, andere labels als tag-chips
+### Commit efddfbb — 5 feedbackverbeteringen
+1. **Score-tooltips** — Vraagtekenicoontje (?) naast engagement rate, community score en gekleurde badges; bij hover verschijnt uitleg van drempelwaarden
+2. **Insights fix (ronde 1)** — "mainstream" toegevoegd als internationale ambitie; budget drempel €500; emotie/resonantie per veld gecheckt
+3. **Inzichten bovenaan subpagina's** — InsightCards staan nu helemaal bovenaan op alle 7 subpagina's (vóór de data)
+4. **SVG organogram** — Clean boomstructuur: lead-node bovenaan, teamleden in eigen nodes, gestippelde lijn naar rollen/beslissingsproces
+5. **Kleurcodering scores** — Engagement rate en community score uitgelegd via tooltip
 
-### Kleurcodering scores
-5. **Engagement rate** — Rood <2%, oranje 2-5%, groen >5% — met badge en gekleurde achtergrond
-6. **Community score** — Rood <40%, oranje 40-70%, groen >70%
-7. **Contentmix** — Oranje waarschuwing bij >60% dominantie in donut-legenda
-
-### Performance fix
-8. **Balken verwijderd** — Likes/Comments/Shares als grote getallen in aparte kaartjes, geen misleidende balkbreedte
-9. **Engagement rate apart** — Groot gekleurd kaartje met badge (Laag/Gemiddeld/Goed)
-
-### Team hiërarchie (OrgChart)
-10. **Visueel organogram** — team/leden, rollen en werking samengevoegd in één visual
-    - Eindverantwoordelijke bovenaan (donker blok)
-    - Overige leden in rij eronder
-    - Rollen als beschrijvingstekst in midden
-    - Werking als blauw "Beslissingsproces" onderaan
-
-### PDF export (split button)
-11. **PDF als hoofdexport** — Knop exporteert via `window.print()` naar volledig rapport
-12. **JSON als secundaire optie** — Dropdown-pijltje naast PDF-knop
-13. **PDF-inhoud** — Alle secties: A–J intern + A–E extern, SWOT-grid 2×2, concurrentietabel
-
-### Samenvattingspagina
-14. **Eerste tab** — Standaard zichtbaar bij openen van een analyse
-15. **Metrics** — Community score + engagement rate als gekleurde blokken
-16. **Contentmix dominant** — Welke categorie overheerst + waarschuwing bij >60%
-17. **Doelgroep** — Gewenst vs werkelijk met waarschuwing bij verschil
-18. **SWOT highlights** — Top 2 sterktes + top 2 bedreigingen
-19. **Gaps** — 5 automatisch gegenereerde gaps op basis van data
-
-### Automatische inzichten (4 verbindingen)
-20. **Kanaal mismatch** — Doelgroep gebruikt platform dat ontbreekt in kanaalstrategie
-21. **Promo vs resonantie** — Promo >50% + zwakke emotie/doelgroepresonantie
-22. **Tone vs community** — Afstandelijke tone of voice + community score <50%
-23. **Budget vs ambitie** — Beperkt budget + internationale gewenste doelgroep
-24. **Dubbele zichtbaarheid** — Inzichten op samenvattingspagina én op relevante subpagina's
+### Commit d56e7a0 — Insights bugfix + 5 nieuwe verbindingen
+6. **Bugfix verbindingen** — Alle 9 inzichten geëvalueerd via onafhankelijke try/catch blokken; geen vroeg afbreken meer
+7. **Inzicht 5: Frequentie vs engagement** — >5 posts/week + engagement <5% → rood (urgent)
+8. **Inzicht 6: Concurrentie gap** — "Wat doen zij niet" matcht positionering → blauw (kans)
+9. **Inzicht 7: UGC vs community** — Weinig UGC + community score >60% → blauw (kans)
+10. **Inzicht 8: Markt vs middelen** — Verzadigde markt + budget <€500 → rood (urgent)
+11. **Inzicht 9: Groeiende trend vs contentmix** — Stijgende trend + categorie <10% → blauw (kans)
+12. **InsightCard kleuren** — Oranje = spanning, Blauw = kans, Rood = urgent
+13. **Inzichtenteller** — "N inzichten gedetecteerd" bovenaan blok met kleurcodering (grijs/amber/rood)
 
 ---
 
@@ -63,11 +38,13 @@
 - Multi-client analyse beheer (aanmaken, opslaan, openen, verwijderen)
 - PDF export (print-dialoog) + JSON export/import
 - Samenvattingspagina als standaard eerste tab
-- Interne analyse: Organisatie (met OrgChart), Merkidentiteit, Kanaalstrategie, Doelgroep, Content, Strategie, Community, Middelen, SWOT
+- Interne analyse: Organisatie (met SVG OrgChart), Merkidentiteit, Kanaalstrategie, Doelgroep, Content, Strategie, Community, Middelen, SWOT
 - Externe analyse: Concurrentie (multi, scrollbare tabel), Samenwerkingen, Markt/Scene, Doelgroepgedrag, Culturele trends (met richtingspijlen)
-- Dashboard: gekleurde badges, IconDataCards, tag-chips, OrgChart, performance metrics
+- Dashboard: gekleurde badges + tooltips, IconDataCards, tag-chips, SVG organogram, performance metrics
 - Visueel: donut contentmix, format-balken, doelgroep vergelijking, community score-meter
-- Automatische inzichten: 4 data-verbindingen gedetecteerd en weergegeven
+- Automatische inzichten: 9 data-verbindingen, 3 kleurtypen, teller bovenaan
+- Score-tooltips: engagement rate, community score, badge-legenda
+- Inzichten prominent bovenaan elke subpagina
 - LocalStorage persistentie met automatische migratie
 
 ### Tech stack
