@@ -236,75 +236,148 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const int = analysis.interneAnalyse || {};
       const ext = analysis.externeAnalyse || {};
 
-      // 1 — Kanaal mismatch: doelgroep gebruikt platform dat ontbreekt in kanaalstrategie
-      const doelgroepPlatforms = (
-        (ext.doelgroepgedrag?.platformgebruik || '') + ' ' + (int.doelgroep?.gedrag || '')
-      ).toLowerCase();
-      const actieveKanalen = (int.kanaalstrategie?.actievePlatformen || '').toLowerCase();
-      const platforms = ['tiktok','instagram','youtube','twitter','linkedin','facebook','snapchat','spotify','soundcloud','discord','twitch','pinterest','reddit','threads'];
-      let kanaalMismatchPlatform = null;
-      for (const p of platforms) {
-        if (doelgroepPlatforms.includes(p) && !actieveKanalen.includes(p)) {
-          kanaalMismatchPlatform = p;
-          break;
-        }
-      }
-      if (kanaalMismatchPlatform) {
-        insights.push({
-          id: 'kanaal-mismatch', type: 'tension', icon: '📱', title: 'Kanaal mismatch',
-          text: `Mismatch gedetecteerd: ${kanaalMismatchPlatform.charAt(0).toUpperCase() + kanaalMismatchPlatform.slice(1)} wordt gebruikt door je doelgroep maar ontbreekt in je kanaalstrategie.`,
-          pages: ['doelgroep','kanaalstrategie']
-        });
-      }
-
-      // 2 — Promo > 50% EN zwakke emotie of doelgroepresonantie
+      // Gedeelde helpers — eenmalig berekend, veilig herbruikbaar
+      const budget = (int.middelen?.budget || '').toLowerCase();
+      const budgetBeperkt = budget.includes('beperkt') || (() => {
+        const m = budget.match(/€\s*([\d.,]+)/);
+        if (!m) return false;
+        return parseFloat(m[1].replace(/\./g, '').replace(',', '.')) < 500;
+      })();
+      const erNum = parseEngagementRate(int.contentanalyse?.gemiddeldeEngagementRate || '');
+      const commScore = computeCommunityScore(int.communityAnalyse || {});
       const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
       const cnts = mixKeys.map(k => Number(int.contentanalyse?.[k]) || 0);
-      const tot = cnts.reduce((a,b) => a+b, 0);
-      const promoPct = tot > 0 ? (cnts[0] / tot) * 100 : 0;
-      const emotie = (int.strategischeContent?.emotie || '').toLowerCase();
-      const resonantie = (int.strategischeContent?.doelgroepresonantie || '').toLowerCase();
-      const weakWords = ['zwak','laag','beperkt','geen','matig','weinig'];
-      const emotieWeak = weakWords.some(w => emotie.includes(w) || resonantie.includes(w));
-      if (promoPct > 50 && emotieWeak) {
-        insights.push({
+      const mixTot = cnts.reduce((a, b) => a + b, 0);
+
+      // ── 1 — Kanaal mismatch ────────────────────────────────────────────────
+      try {
+        const doelgroepPlatforms = (
+          (ext.doelgroepgedrag?.platformgebruik || '') + ' ' + (int.doelgroep?.gedrag || '')
+        ).toLowerCase();
+        const actieveKanalen = (int.kanaalstrategie?.actievePlatformen || '').toLowerCase();
+        const platforms = ['tiktok','instagram','youtube','twitter','linkedin','facebook','snapchat','spotify','soundcloud','discord','twitch','pinterest','reddit','threads'];
+        let found = null;
+        for (const p of platforms) {
+          if (doelgroepPlatforms.includes(p) && !actieveKanalen.includes(p)) { found = p; break; }
+        }
+        if (found) insights.push({
+          id: 'kanaal-mismatch', type: 'tension', icon: '📱', title: 'Kanaal mismatch',
+          text: `Mismatch gedetecteerd: ${found.charAt(0).toUpperCase() + found.slice(1)} wordt gebruikt door je doelgroep maar ontbreekt in je kanaalstrategie.`,
+          pages: ['doelgroep','kanaalstrategie']
+        });
+      } catch (_) {}
+
+      // ── 2 — Promo > 50% EN zwakke emotie / resonantie ─────────────────────
+      try {
+        const promoPct = mixTot > 0 ? (cnts[0] / mixTot) * 100 : 0;
+        const emotie = (int.strategischeContent?.emotie || '').toLowerCase();
+        const resonantie = (int.strategischeContent?.doelgroepresonantie || '').toLowerCase();
+        const weakWords = ['zwak','laag','beperkt','geen','matig','weinig'];
+        const emotieWeak = weakWords.some(w => emotie.includes(w) || resonantie.includes(w));
+        if (promoPct > 50 && emotieWeak) insights.push({
           id: 'promo-emotie', type: 'tension', icon: '📢', title: 'Hoge promofocus',
           text: 'Hoge promofocus gecombineerd met lage emotionele resonantie — overweeg meer verbindende contentcategorieën.',
           pages: ['contentanalyse','strategisch']
         });
-      }
+      } catch (_) {}
 
-      // 3 — Community score < 50% EN afstandelijke tone of voice
-      const commScore = computeCommunityScore(int.communityAnalyse || {});
-      const tov = (
-        (int.merkidentiteit?.toneOfVoice || '') + ' ' + (int.strategischeContent?.toneOfVoice || '')
-      ).toLowerCase();
-      const distantWords = ['afstandelijk','minimalistisch','formeel'];
-      const isDistant = distantWords.some(w => tov.includes(w));
-      if (commScore < 50 && isDistant) {
-        insights.push({
+      // ── 3 — Community score < 50% EN afstandelijke tone of voice ──────────
+      try {
+        const tov = (
+          (int.merkidentiteit?.toneOfVoice || '') + ' ' + (int.strategischeContent?.toneOfVoice || '')
+        ).toLowerCase();
+        const isDistant = ['afstandelijk','minimalistisch','formeel'].some(w => tov.includes(w));
+        if (commScore < 50 && isDistant) insights.push({
           id: 'tone-community', type: 'tension', icon: '🗣️', title: 'Tone of voice vs. community',
           text: 'Afstandelijke tone of voice correleert met lage community score — overweeg een warmere communicatiestijl.',
           pages: ['community','merkidentiteit']
         });
-      }
+      } catch (_) {}
 
-      // 4 — Beperkt budget EN internationale ambitie
-      const budget = (int.middelen?.budget || '').toLowerCase();
-      const gwDoelgroep = (int.doelgroep?.gewensteDoelgroep || '').toLowerCase();
-      const budgetBeperkt = budget.includes('beperkt') || (() => {
-        const m = budget.match(/€\s*([\d.,]+)/);
-        if (!m) return false;
-        return parseFloat(m[1].replace(/\./g,'').replace(',','.')) < 500;
-      })();
-      const isInternationaal = gwDoelgroep.includes('internationaal') || gwDoelgroep.includes('mainstream') || gwDoelgroep.includes('europees');
-      if (budgetBeperkt && isInternationaal) {
-        insights.push({
+      // ── 4 — Beperkt budget EN internationale ambitie ───────────────────────
+      try {
+        const gwDoelgroep = (int.doelgroep?.gewensteDoelgroep || '').toLowerCase();
+        const isInternationaal = ['internationaal','mainstream','europees'].some(w => gwDoelgroep.includes(w));
+        if (budgetBeperkt && isInternationaal) insights.push({
           id: 'budget-ambitie', type: 'tension', icon: '💰', title: 'Budget vs. internationale ambitie',
           text: 'Spanningsveld gedetecteerd: internationale ambitie met beperkt budget vereist een gefaseerde aanpak.',
           pages: ['middelen','doelgroep']
         });
-      }
+      } catch (_) {}
+
+      // ── 5 — Hoge postfrequentie EN lage engagement rate ───────────────────
+      try {
+        const frequentie = (int.contentanalyse?.frequentie || '').toLowerCase();
+        const hogeFreq = (() => {
+          const m = frequentie.match(/(\d+)\s*(?:x|keer|posts?)?\s*(?:per\s*week|\/week)/);
+          if (m) return parseInt(m[1]) > 5;
+          return frequentie.includes('dagelijks') || frequentie.includes('elke dag') ||
+                 /[6-9]\s*(?:per week|\/week)/.test(frequentie);
+        })();
+        if (hogeFreq && erNum !== null && erNum < 5) insights.push({
+          id: 'freq-engagement', type: 'urgent', icon: '⚠️', title: 'Frequentie vs. engagement',
+          text: 'Hoge postfrequentie met lage engagement — meer posts lossen dit niet op, focus op contentkwaliteit.',
+          pages: ['contentanalyse']
+        });
+      } catch (_) {}
+
+      // ── 6 — Concurrentie gap sluit aan op eigen positionering ─────────────
+      try {
+        const positionering = (
+          (int.merkidentiteit?.huidigePositionering || '') + ' ' + (int.merkidentiteit?.waardenMissie || '')
+        ).toLowerCase();
+        const concurrenten = Array.isArray(ext.concurrentieanalyse) ? ext.concurrentieanalyse : [];
+        const keywords = (positionering.match(/\b[a-z\u00e0-\u024f]{4,}\b/g) || []);
+        const gapMatch = positionering.trim() && concurrenten.some(c => {
+          const watNiet = (c.watDoenZijNiet || '').toLowerCase();
+          return watNiet && keywords.some(kw => watNiet.includes(kw));
+        });
+        if (gapMatch) insights.push({
+          id: 'concurrentie-gap', type: 'opportunity', icon: '🎯', title: 'Strategische positioneringskans',
+          text: 'Jouw positionering sluit aan op een gap die concurrenten laten liggen — dit is een strategische kans.',
+          pages: ['concurrentie','merkidentiteit']
+        });
+      } catch (_) {}
+
+      // ── 7 — Weinig UGC EN hoge community score ─────────────────────────────
+      try {
+        const ugc = (int.communityAnalyse?.userGeneratedContent || '').toLowerCase();
+        const ugcLaag = ['zelden','geen','weinig','nauwelijks','niet'].some(w => ugc.includes(w));
+        if (ugcLaag && ugc.trim() && commScore > 60) insights.push({
+          id: 'ugc-community', type: 'opportunity', icon: '✍️', title: 'UGC potentieel onbenut',
+          text: 'Hoge community score maar weinig UGC — stimuleer volgers om zelf content te maken.',
+          pages: ['community']
+        });
+      } catch (_) {}
+
+      // ── 8 — Verzadigde markt EN beperkt budget ────────────────────────────
+      try {
+        const markt = (ext.marktSceneAnalyse?.marktverzadiging || '').toLowerCase();
+        const verzadigd = ['hoge verzadiging','hoog','veel concurrentie','verzadigd','oververzadigd'].some(w => markt.includes(w));
+        if (verzadigd && markt.trim() && budgetBeperkt) insights.push({
+          id: 'markt-middelen', type: 'urgent', icon: '🔴', title: 'Verzadigde markt, beperkt budget',
+          text: 'Verzadigde markt met beperkt budget vereist een zeer scherpe niche-focus.',
+          pages: ['markt','middelen']
+        });
+      } catch (_) {}
+
+      // ── 9 — Groeiende trend ondervertegenwoordigd in contentmix ───────────
+      try {
+        const trendVelden = [
+          ext.cultureleTrends?.genrePopulariteit,
+          ext.cultureleTrends?.nostalgieTrends,
+          ext.cultureleTrends?.diyCultuur,
+          ext.cultureleTrends?.authenticiteitVsCommercialisering,
+        ].map(v => (v || '').toLowerCase());
+        const groeiendeWords = ['groeiend','stijgend','groei','stijgt','toename','opkomst','populairder'];
+        const hasGroeiend = trendVelden.some(t => t.trim() && groeiendeWords.some(w => t.includes(w)));
+        const heeftGap = mixTot > 0 && cnts.some(c => (c / mixTot) * 100 < 10);
+        if (hasGroeiend && heeftGap) insights.push({
+          id: 'trend-contentmix', type: 'opportunity', icon: '📈', title: 'Groeiende trend onderbenut',
+          text: 'Groeiende trend gedetecteerd die ondervertegenwoordigd is in je contentmix — overweeg dit te benutten.',
+          pages: ['trends','contentanalyse']
+        });
+      } catch (_) {}
 
       return insights;
     }
@@ -560,14 +633,20 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     // ─── Insight card ─────────────────────────────────────────────────────────
+    const INSIGHT_COLORS = {
+      tension:     { bg: 'bg-orange-50', border: 'border-orange-200', title: 'text-orange-700', text: 'text-orange-800' },
+      opportunity: { bg: 'bg-blue-50',   border: 'border-blue-200',   title: 'text-blue-700',   text: 'text-blue-800'   },
+      urgent:      { bg: 'bg-red-50',    border: 'border-red-200',    title: 'text-red-700',    text: 'text-red-800'    },
+    };
+
     function InsightCard({ insight }) {
-      const orange = insight.type === 'tension';
+      const c = INSIGHT_COLORS[insight.type] || INSIGHT_COLORS.opportunity;
       return (
-        <div className={`rounded-xl p-4 flex gap-3 items-start border ${orange ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'}`}>
+        <div className={`rounded-xl p-4 flex gap-3 items-start border ${c.bg} ${c.border}`}>
           <span className="text-base shrink-0 mt-0.5">{insight.icon}</span>
           <div>
-            <p className={`text-xs font-bold mb-1 ${orange ? 'text-orange-700' : 'text-blue-700'}`}>{insight.title}</p>
-            <p className={`text-xs leading-relaxed ${orange ? 'text-orange-800' : 'text-blue-800'}`}>{insight.text}</p>
+            <p className={`text-xs font-bold mb-1 ${c.title}`}>{insight.title}</p>
+            <p className={`text-xs leading-relaxed ${c.text}`}>{insight.text}</p>
           </div>
         </div>
       );
@@ -575,8 +654,16 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
     function InzichtenBlok({ insights, title = 'Automatische inzichten' }) {
       if (!insights || !insights.length) return null;
+      const n = insights.length;
+      const countBg = n >= 5 ? 'bg-red-100 text-red-600' : n >= 3 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-500';
       return (
-        <DCard title={title}>
+        <DCard>
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-50">
+            <h4 className="text-sm font-semibold text-gray-800">{title}</h4>
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${countBg}`}>
+              {n} {n === 1 ? 'inzicht' : 'inzichten'} gedetecteerd
+            </span>
+          </div>
           <div className="space-y-3">
             {insights.map(i => <InsightCard key={i.id} insight={i} />)}
           </div>
