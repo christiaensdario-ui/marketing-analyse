@@ -132,6 +132,42 @@
       return new Date(iso).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
     }
 
+    // ─── Score helpers ────────────────────────────────────────────────────────
+    function parseEngagementRate(str) {
+      if (!str || !String(str).trim()) return null;
+      const m = String(str).match(/[\d,.]+/);
+      return m ? parseFloat(m[0].replace(',', '.')) : null;
+    }
+
+    function engagementRateColor(rate) {
+      if (rate === null) return { bg: 'bg-gray-50', text: 'text-gray-500', border: 'border-gray-200', label: null, color: '#9ca3af' };
+      if (rate < 2)  return { bg: 'bg-red-50',     text: 'text-red-600',     border: 'border-red-200',     label: 'Laag',      color: '#ef4444' };
+      if (rate <= 5) return { bg: 'bg-amber-50',   text: 'text-amber-600',   border: 'border-amber-200',   label: 'Gemiddeld', color: '#f59e0b' };
+      return               { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200', label: 'Goed',      color: '#10b981' };
+    }
+
+    function computeCommunityScore(data) {
+      const scoreField = (v) => {
+        if (!v || !String(v).trim()) return 0;
+        const len = String(v).trim().length;
+        if (len < 20) return 0.5;
+        if (len < 80) return 1;
+        return 1.5;
+      };
+      const raw =
+        scoreField(data.interactieComments) +
+        scoreField(data.terugkerendeFans) +
+        scoreField(data.userGeneratedContent) +
+        scoreField(data.communityBetrokkenheid);
+      return Math.min(100, Math.round((raw / 6) * 100));
+    }
+
+    function communityScoreColor(pct) {
+      if (pct < 40)  return { color: '#ef4444', text: 'text-red-600',     bg: 'bg-red-50',     border: 'border-red-200',     label: 'Laag' };
+      if (pct <= 70) return { color: '#f59e0b', text: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200',   label: 'Groeiend' };
+      return               { color: '#10b981', text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Sterk' };
+    }
+
     function exportAnalysis(analysis) {
       const json = JSON.stringify(analysis, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
@@ -141,6 +177,106 @@
       a.download = `analyse-${(analysis.klantnaam || 'export').replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    // ─── PDF export ───────────────────────────────────────────────────────────
+    function escHtml(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function pdfField(label, value) {
+      const v = String(value || '').trim();
+      if (!v) return `<div class="f"><div class="fl">${escHtml(label)}</div><span class="em">—</span></div>`;
+      return `<div class="f"><div class="fl">${escHtml(label)}</div><div class="fv">${escHtml(v).replace(/\n/g,'<br>')}</div></div>`;
+    }
+    function exportPDF(analysis) {
+      const { interneAnalyse: int, externeAnalyse: ext, klantnaam, datum } = analysis;
+      const ca = int.contentanalyse;
+      const competitors = Array.isArray(ext.concurrentieanalyse) ? ext.concurrentieanalyse : [ext.concurrentieanalyse || {}];
+      const compLabels = ['Positionering','Branding','Content','Community','Engagement','Differentiatie','Wat doen zij NIET?'];
+      const compKeys   = ['positionering','branding','content','community','engagement','differentiatie','watDoenZijNiet'];
+      const compTable = `<table><thead><tr><th></th>${competitors.map((c,i)=>`<th>${escHtml(c.naam||`Concurrent ${i+1}`)}</th>`).join('')}</tr></thead><tbody>${compKeys.map((k,ri)=>`<tr><td><strong>${compLabels[ri]}</strong></td>${competitors.map(c=>`<td>${escHtml(c[k]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      const dateStr = new Date(datum).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
+      const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><title>${escHtml(klantnaam||'Analyse')}</title><style>
+*{box-sizing:border-box;margin:0;padding:0}@page{margin:2cm;size:A4}body{font-family:-apple-system,Arial,sans-serif;font-size:11px;color:#1f2937;line-height:1.5}
+.hdr{margin-bottom:24px;padding-bottom:14px;border-bottom:3px solid #1f2937}.hdr h1{font-size:24px;font-weight:800;margin-bottom:3px}.hdr .meta{color:#6b7280;font-size:11px}
+h2{font-size:13px;font-weight:700;margin:20px 0 8px;padding:5px 10px;background:#f9fafb;border-left:3px solid #374151}
+.f{margin-bottom:9px;page-break-inside:avoid}.fl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:2px}.fv{font-size:11px}.em{color:#d1d5db;font-style:italic;font-size:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}.sc{border:1px solid #e5e7eb;border-radius:6px;padding:10px}.sc-s{background:#f0fdf4}.sc-w{background:#fef2f2}.sc-o{background:#eff6ff}.sc-t{background:#fffbeb}
+.sl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}.sc-s .sl{color:#059669}.sc-w .sl{color:#dc2626}.sc-o .sl{color:#2563eb}.sc-t .sl{color:#d97706}
+table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{border:1px solid #e5e7eb;padding:5px 8px;text-align:left;vertical-align:top}th{background:#f9fafb;font-weight:600}
+.pb{page-break-before:always}
+</style></head><body>
+<div class="hdr"><h1>${escHtml(klantnaam||'Naamloos')}</h1><div class="meta">Marketing Analyse · ${dateStr}</div></div>
+<h2>A — Organisatie / structuur</h2>${pdfField('Type label / bedrijf',int.organisatie.labelType)}${pdfField('Geschiedenis',int.organisatie.geschiedenis)}${pdfField('Team / leden',int.organisatie.team)}${pdfField('Rollen en managementstructuur',int.organisatie.rollenManagement)}${pdfField('Werking',int.organisatie.werking)}
+<h2>B — Merkidentiteit</h2>${pdfField('Visuele identiteit',int.merkidentiteit.visuelIdentiteit)}${pdfField('Tone of voice',int.merkidentiteit.toneOfVoice)}${pdfField('Consistentie van branding',int.merkidentiteit.consistentieBranding)}${pdfField('Waarden en missie',int.merkidentiteit.waardenMissie)}${pdfField('Huidige positionering',int.merkidentiteit.huidigePositionering)}
+<h2>C — Kanaalstrategie</h2>${pdfField('Actieve platformen',int.kanaalstrategie.actievePlatformen)}${pdfField('Onderbouwing per platform',int.kanaalstrategie.onderbouwingPerPlatform)}${pdfField('Primair kanaal',int.kanaalstrategie.primairKanaal)}${pdfField('Ontbrekende kanalen',int.kanaalstrategie.ontbrekendeKanalen)}
+<h2>D — Doelgroep</h2>${pdfField('Wie volgt het merk nu?',int.doelgroep.wieVolgt)}${pdfField('Leeftijd / interesses',int.doelgroep.leeftijdInteresses)}${pdfField('Gedrag',int.doelgroep.gedrag)}${pdfField('Engagement',int.doelgroep.engagement)}${pdfField('Community interactie',int.doelgroep.communityInteractie)}${pdfField('Gewenste doelgroep',int.doelgroep.gewensteDoelgroep)}${pdfField('Werkelijke doelgroep',int.doelgroep.werkelijkeDoelgroep)}
+<h2>E — Contentanalyse</h2>${pdfField('Frequentie',ca.frequentie)}${pdfField('Gem. likes',ca.gemiddeldeLikes)}${pdfField('Gem. comments',ca.gemiddeldeComments)}${pdfField('Gem. shares',ca.gemiddeldeShares)}${pdfField('Engagement rate',ca.gemiddeldeEngagementRate)}${pdfField('Formats — Foto',ca.formatsFoto?.uitleg)}${pdfField('Formats — Video',ca.formatsVideo?.uitleg)}${pdfField('Formats — Reels',ca.formatsReels?.uitleg)}${pdfField('Formats — Carousels',ca.formatsCarousels?.uitleg)}
+<h2>G — Strategische contentanalyse</h2>${pdfField('Positioneringsconsistentie',int.strategischeContent.positioneringsconsistentie)}${pdfField('Tone of voice',int.strategischeContent.toneOfVoice)}${pdfField('Storytelling',int.strategischeContent.storytelling)}${pdfField('Emotie',int.strategischeContent.emotie)}${pdfField('Doelgroepresonantie',int.strategischeContent.doelgroepresonantie)}${pdfField('Formatstrategie',int.strategischeContent.formatstrategie)}
+<h2>H — Community analyse</h2>${pdfField('Interactie in comments',int.communityAnalyse.interactieComments)}${pdfField('Terugkerende fans',int.communityAnalyse.terugkerendeFans)}${pdfField('User generated content',int.communityAnalyse.userGeneratedContent)}${pdfField('DM interacties',int.communityAnalyse.dmInteracties)}${pdfField('Community betrokkenheid',int.communityAnalyse.communityBetrokkenheid)}${pdfField('Publiek of echte community?',int.communityAnalyse.publiefOfCommunity)}
+<h2>I — Middelen</h2>${pdfField('Budget',int.middelen.budget)}${pdfField('Tijd',int.middelen.tijd)}${pdfField('Team',int.middelen.team)}${pdfField('Netwerk',int.middelen.netwerk)}${pdfField('Skills',int.middelen.skills)}
+<h2>J — SWOT</h2><div class="grid2"><div class="sc sc-s"><div class="sl">Strengths</div>${escHtml(int.swot.strengths||'—').replace(/\n/g,'<br>')}</div><div class="sc sc-w"><div class="sl">Weaknesses</div>${escHtml(int.swot.weaknesses||'—').replace(/\n/g,'<br>')}</div><div class="sc sc-o"><div class="sl">Opportunities</div>${escHtml(int.swot.opportunities||'—').replace(/\n/g,'<br>')}</div><div class="sc sc-t"><div class="sl">Threats</div>${escHtml(int.swot.threats||'—').replace(/\n/g,'<br>')}</div></div>
+<div class="pb"></div>
+<h2>A — Concurrentieanalyse</h2>${compTable}
+<h2>B — Samenwerkingen en netwerk</h2>${pdfField('Potentiële partners',ext.samenwerkingen.potentielePartners)}${pdfField('Gatekeepers in de scene',ext.samenwerkingen.gatekeepers)}${pdfField('Bestaande samenwerkingen',ext.samenwerkingen.bestaandeSamenwerkingen)}${pdfField('Ontbrekende samenwerkingen',ext.samenwerkingen.ontbrekendeSamenwerkingen)}
+<h2>C — Markt / scene analyse</h2>${pdfField('Grootte van de scene',ext.marktSceneAnalyse.grootteScene)}${pdfField('Populariteit van het genre',ext.marktSceneAnalyse.populariteitGenre)}${pdfField('Aantal events',ext.marktSceneAnalyse.aantalEvents)}${pdfField('Andere labels / collectieven',ext.marktSceneAnalyse.andereLabels)}${pdfField('Marktverzadiging',ext.marktSceneAnalyse.marktverzadiging)}
+<h2>D — Doelgroepgedrag</h2>${pdfField('Hoe ontdekken ze muziek?',ext.doelgroepgedrag.ontdekkingMuziek)}${pdfField('Welke platformen gebruiken ze?',ext.doelgroepgedrag.platformgebruik)}${pdfField('Wat motiveert hen?',ext.doelgroepgedrag.motivatie)}${pdfField('Wie beïnvloedt hen?',ext.doelgroepgedrag.invloeden)}
+<h2>E — Culturele trends</h2>${pdfField('Stijgende populariteit van een genre',ext.cultureleTrends.genrePopulariteit)}${pdfField('Nostalgie trends',ext.cultureleTrends.nostalgieTrends)}${pdfField('DIY cultuur',ext.cultureleTrends.diyCultuur)}${pdfField('Authenticiteit vs commercialisering',ext.cultureleTrends.authenticiteitVsCommercialisering)}
+</body></html>`;
+      const win = window.open('','_blank');
+      if (!win) { alert('Pop-up geblokkeerd. Sta pop-ups toe voor deze pagina om PDF te exporteren.'); return; }
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => { win.focus(); win.print(); }, 400);
+    }
+
+    // ─── Insights detection ───────────────────────────────────────────────────
+    function detectInsights(analysis) {
+      const insights = [];
+      const { interneAnalyse: int, externeAnalyse: ext } = analysis;
+
+      // 1 — Doelgroep platforms vs kanaalstrategie
+      const doelgroepPlatforms = ((ext.doelgroepgedrag?.platformgebruik || '') + ' ' + (int.doelgroep?.gedrag || '')).toLowerCase();
+      const actieveKanalen = (int.kanaalstrategie?.actievePlatformen || '').toLowerCase();
+      const platforms = ['tiktok','instagram','youtube','twitter','linkedin','facebook','snapchat','spotify','soundcloud','discord','twitch','pinterest','reddit','threads'];
+      for (const p of platforms) {
+        if (doelgroepPlatforms.includes(p) && !actieveKanalen.includes(p)) {
+          insights.push({ id: 'kanaal-mismatch', type: 'tension', icon: '📱', title: 'Kanaal mismatch', text: `Mismatch gedetecteerd: ${p.charAt(0).toUpperCase()+p.slice(1)} wordt gebruikt door je doelgroep maar ontbreekt in je kanaalstrategie.`, pages: ['doelgroep','kanaalstrategie'] });
+          break;
+        }
+      }
+
+      // 2 — Promo > 50% AND weak emotion/resonance
+      const keys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
+      const cnts = keys.map(k => Number(int.contentanalyse[k]) || 0);
+      const tot = cnts.reduce((a,b) => a+b, 0);
+      const promoPct = tot > 0 ? (cnts[0] / tot) * 100 : 0;
+      const emotieText = ((int.strategischeContent?.emotie || '') + ' ' + (int.strategischeContent?.doelgroepresonantie || '')).toLowerCase();
+      const weakWords = ['zwak','laag','beperkt','geen','matig','weinig'];
+      const emotieWeak = weakWords.some(w => new RegExp(`\\b${w}`).test(emotieText));
+      if (promoPct > 50 && emotieWeak) {
+        insights.push({ id: 'promo-emotie', type: 'tension', icon: '📢', title: 'Hoge promofocus', text: 'Hoge promofocus gecombineerd met lage emotionele resonantie — overweeg meer verbindende contentcategorieën.', pages: ['contentanalyse','strategisch'] });
+      }
+
+      // 3 — Community score < 50% AND distant tone of voice
+      const commScore = computeCommunityScore(int.communityAnalyse);
+      const tov = ((int.merkidentiteit?.toneOfVoice || '') + ' ' + (int.strategischeContent?.toneOfVoice || '')).toLowerCase();
+      const distantWords = ['afstandelijk','minimalistisch','formeel'];
+      const isDistant = distantWords.some(w => tov.includes(w));
+      if (commScore < 50 && isDistant) {
+        insights.push({ id: 'tone-community', type: 'tension', icon: '🗣️', title: 'Tone of voice vs. community', text: 'Afstandelijke tone of voice correleert met lage community score — overweeg een warmere communicatiestijl.', pages: ['community','merkidentiteit'] });
+      }
+
+      // 4 — Beperkt budget AND internationale ambitie
+      const budget = (int.middelen?.budget || '').toLowerCase();
+      const gwDoelgroep = (int.doelgroep?.gewensteDoelgroep || '').toLowerCase();
+      const budgetBeperkt = budget.includes('beperkt') || (() => { const m = budget.match(/€\s*([\d.,]+)/); if (!m) return false; return parseFloat(m[1].replace('.','').replace(',','.')) < 1000; })();
+      const isInternationaal = gwDoelgroep.includes('internationaal') || gwDoelgroep.includes('europees');
+      if (budgetBeperkt && isInternationaal) {
+        insights.push({ id: 'budget-ambitie', type: 'tension', icon: '💰', title: 'Budget vs. internationale ambitie', text: 'Spanningsveld gedetecteerd: internationale ambitie met beperkt budget vereist een gefaseerde aanpak.', pages: ['middelen','doelgroep'] });
+      }
+
+      return insights;
     }
 
     // ─── Form UI primitives ───────────────────────────────────────────────────
@@ -225,37 +361,37 @@
       );
     }
 
-    // Performance metric cards + optional bars
+    // Performance metric cards — big numbers, no misleading bars
     function PerformancePanel({ data }) {
+      const erStr = data.gemiddeldeEngagementRate;
+      const erNum = parseEngagementRate(erStr);
+      const erc = engagementRateColor(erNum);
       const metrics = [
-        { label: 'Gemiddelde likes',           value: data.gemiddeldeLikes },
-        { label: 'Gemiddelde comments',        value: data.gemiddeldeComments },
-        { label: 'Gemiddelde shares',          value: data.gemiddeldeShares },
-        { label: 'Gemiddelde engagement rate', value: data.gemiddeldeEngagementRate },
+        { label: 'Likes',    value: data.gemiddeldeLikes },
+        { label: 'Comments', value: data.gemiddeldeComments },
+        { label: 'Shares',   value: data.gemiddeldeShares },
       ];
-      const extractNum = str => { const m = str && str.match(/[\d,.]+/); return m ? parseFloat(m[0].replace(',', '.')) : null; };
-      const nums = metrics.map(m => extractNum(m.value));
-      const hasNums = nums.some(n => n !== null);
-      const maxNum = hasNums ? Math.max(...nums.filter(n => n !== null), 1) : 1;
-
       return (
         <div className="space-y-4">
-          {metrics.map((m, i) => (
-            <div key={i}>
-              <div className="flex justify-between items-baseline mb-1.5">
-                <span className="text-xs font-medium text-gray-500">{m.label}</span>
-                <span className="text-sm font-semibold text-gray-800">{m.value || '—'}</span>
+          <div className="grid grid-cols-3 gap-3">
+            {metrics.map((m, i) => (
+              <div key={i} className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
+                <p className="text-lg font-bold text-gray-900 truncate">{m.value || '—'}</p>
+                <p className="text-xs text-gray-400 mt-1">{m.label}</p>
               </div>
-              {hasNums && (
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gray-700 rounded-full transition-all duration-500"
-                    style={{ width: nums[i] !== null ? `${(nums[i] / maxNum) * 100}%` : '0%' }}
-                  />
-                </div>
-              )}
+            ))}
+          </div>
+          <div className={`${erc.bg} border ${erc.border} rounded-xl p-4 flex items-center justify-between`}>
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-1">Engagement rate</p>
+              <p className={`text-2xl font-bold ${erc.text}`}>{erStr || '—'}</p>
             </div>
-          ))}
+            {erc.label && (
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>
+                {erc.label}
+              </span>
+            )}
+          </div>
         </div>
       );
     }
@@ -315,14 +451,19 @@
             </svg>
           </div>
           <div className="w-full space-y-2">
-            {arcs.map((arc, i) => arc.count > 0 && (
-              <div key={i} className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: arc.color }} />
-                <span className="text-xs text-gray-600 flex-1 truncate">{arc.label}</span>
-                <span className="text-xs font-semibold text-gray-800">{arc.count}</span>
-                <span className="text-xs text-gray-400 w-9 text-right">{Math.round(arc.frac * 100)}%</span>
-              </div>
-            ))}
+            {arcs.map((arc, i) => {
+              if (!arc.count) return null;
+              const warn = arc.frac > 0.6;
+              return (
+                <div key={i} className={`flex items-center gap-2 rounded-lg ${warn ? 'bg-amber-50 px-2 py-1 -mx-2' : ''}`}>
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: warn ? '#f59e0b' : arc.color }} />
+                  <span className={`text-xs flex-1 truncate ${warn ? 'text-amber-700 font-medium' : 'text-gray-600'}`}>{arc.label}</span>
+                  <span className={`text-xs font-semibold ${warn ? 'text-amber-700' : 'text-gray-800'}`}>{arc.count}</span>
+                  <span className={`text-xs w-9 text-right ${warn ? 'text-amber-600 font-bold' : 'text-gray-400'}`}>{Math.round(arc.frac * 100)}%</span>
+                  {warn && <span className="text-xs text-amber-500" title="Te weinig variatie">⚠</span>}
+                </div>
+              );
+            })}
           </div>
         </div>
       );
@@ -385,58 +526,192 @@
       );
     }
 
+    // ─── Insight card ─────────────────────────────────────────────────────────
+    function InsightCard({ insight }) {
+      const orange = insight.type === 'tension';
+      return (
+        <div className={`rounded-xl p-4 flex gap-3 items-start border ${orange ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'}`}>
+          <span className="text-base shrink-0 mt-0.5">{insight.icon}</span>
+          <div>
+            <p className={`text-xs font-bold mb-1 ${orange ? 'text-orange-700' : 'text-blue-700'}`}>{insight.title}</p>
+            <p className={`text-xs leading-relaxed ${orange ? 'text-orange-800' : 'text-blue-800'}`}>{insight.text}</p>
+          </div>
+        </div>
+      );
+    }
+
+    function InzichtenBlok({ insights, title = 'Automatische inzichten' }) {
+      if (!insights || !insights.length) return null;
+      return (
+        <DCard title={title}>
+          <div className="space-y-3">
+            {insights.map(i => <InsightCard key={i.id} insight={i} />)}
+          </div>
+        </DCard>
+      );
+    }
+
+    // ─── Org chart ────────────────────────────────────────────────────────────
+    function OrgChart({ team, rollen, werking }) {
+      const members = (team || '').split(/[,\n]+/).map(m => m.trim()).filter(Boolean);
+      const hasData = members.length > 0 || rollen || werking;
+      if (!hasData) return <p className="text-sm text-gray-300 italic text-center py-3">—</p>;
+
+      const lead = members[0];
+      const rest = members.slice(1);
+      return (
+        <div className="space-y-1">
+          {lead && (
+            <div className="flex flex-col items-center">
+              <div className="bg-gray-900 text-white rounded-xl px-5 py-2.5 text-sm font-semibold text-center shadow-sm">
+                <span className="text-gray-400 text-xs block mb-0.5 font-normal">Eindverantwoordelijke</span>
+                {lead}
+              </div>
+              {(rest.length > 0 || rollen || werking) && <div className="w-px h-5 bg-gray-300" />}
+            </div>
+          )}
+          {rest.length > 0 && (
+            <div className="flex flex-col items-center">
+              <div className="flex flex-wrap justify-center gap-2">
+                {rest.map((m, i) => (
+                  <div key={i} className="bg-gray-100 border border-gray-200 text-gray-700 rounded-lg px-3 py-2 text-xs font-medium">
+                    {m}
+                  </div>
+                ))}
+              </div>
+              {(rollen || werking) && <div className="w-px h-5 bg-gray-300 mt-1" />}
+            </div>
+          )}
+          {rollen && (
+            <div className="flex flex-col items-center">
+              <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs text-gray-600 text-center max-w-xs w-full leading-relaxed">
+                {rollen}
+              </div>
+              {werking && <div className="w-px h-5 bg-gray-300 mt-1" />}
+            </div>
+          )}
+          {werking && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
+              <p className="text-xs font-semibold text-blue-600 mb-1">⚙️ Beslissingsproces</p>
+              <p className="text-xs text-gray-700 leading-relaxed">{werking}</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ─── Badge detection & icon cards ────────────────────────────────────────
+    function detectBadge(text) {
+      if (!text || !String(text).trim()) return null;
+      const t = String(text).toLowerCase();
+      const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+      const greenWords  = ['sterk', 'consistent', 'goed', 'hoog'];
+      const orangeWords = ['matig', 'gemengd', 'beperkt'];
+      const redWords    = ['zwak', 'inconsistent', 'laag', 'geen'];
+      for (const w of greenWords)  if (new RegExp(`\\b${w}`).test(t)) return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: cap(w) };
+      for (const w of orangeWords) if (new RegExp(`\\b${w}`).test(t)) return { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   label: cap(w) };
+      for (const w of redWords)    if (new RegExp(`\\b${w}`).test(t)) return { bg: 'bg-red-50',     text: 'text-red-600',     border: 'border-red-200',     label: cap(w) };
+      return null;
+    }
+
+    function BadgePill({ bg, text, border, label }) {
+      return (
+        <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full border ${bg} ${text} ${border}`}>
+          {label}
+        </span>
+      );
+    }
+
+    function IconDataCard({ icon, label, value, asTags }) {
+      const badge = detectBadge(value);
+      const empty = !value || !String(value).trim();
+      return (
+        <div className="bg-white border border-gray-100 rounded-xl p-4">
+          <div className="flex items-start gap-2.5 mb-2">
+            <span className="text-sm shrink-0 leading-none mt-0.5">{icon}</span>
+            <span className="text-xs font-semibold text-gray-500 flex-1 leading-snug">{label}</span>
+            {badge && !empty && <BadgePill {...badge} />}
+          </div>
+          {empty
+            ? <p className="text-sm text-gray-300 italic pl-7">—</p>
+            : asTags
+              ? <div className="pl-7"><TagList text={value} /></div>
+              : <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed pl-7">{value}</p>
+          }
+        </div>
+      );
+    }
+
     // ─── Dashboard sub-pages ──────────────────────────────────────────────────
     function PageOrganisatie({ data }) {
       return (
-        <div className="fade-in">
-          <DCard letter="A" title="Organisatie / structuur">
-            <DataRow label="Wat voor label / bedrijf is het?" value={data.labelType} />
-            <DataRow label="Geschiedenis van het merk" value={data.geschiedenis} />
-            <DataRow label="Team / leden" value={data.team} />
-            <DataRow label="Rollen en managementstructuur" value={data.rollenManagement} />
-            <DataRow label="Werking (hoe beslissingen worden genomen)" value={data.werking} />
+        <div className="fade-in space-y-3">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">A</span>
+            <h4 className="text-sm font-semibold text-gray-800">Organisatie / structuur</h4>
+          </div>
+          <div className="bg-slate-50 rounded-2xl p-3 space-y-2">
+            <IconDataCard icon="🏷️" label="Wat voor label / bedrijf is het?" value={data.labelType} />
+            <IconDataCard icon="📖" label="Geschiedenis van het merk" value={data.geschiedenis} />
+          </div>
+          <DCard title="Team structuur">
+            <OrgChart team={data.team} rollen={data.rollenManagement} werking={data.werking} />
           </DCard>
         </div>
       );
     }
 
-    function PageMerkidentiteit({ data }) {
+    function PageMerkidentiteit({ data, insights = [] }) {
       return (
-        <div className="fade-in">
-          <DCard letter="B" title="Merkidentiteit">
-            <DataRow label="Visuele identiteit (logo, kleuren, stijl)" value={data.visuelIdentiteit} />
-            <DataRow label="Tone of voice" value={data.toneOfVoice} />
-            <DataRow label="Consistentie van branding" value={data.consistentieBranding} />
-            <DataRow label="Waarden en missie" value={data.waardenMissie} />
-            <DataRow label="Huidige positionering" value={data.huidigePositionering} />
-          </DCard>
+        <div className="fade-in space-y-3">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">B</span>
+            <h4 className="text-sm font-semibold text-gray-800">Merkidentiteit</h4>
+          </div>
+          <div className="bg-violet-50 rounded-2xl p-3 space-y-2">
+            <IconDataCard icon="🎨" label="Visuele identiteit (logo, kleuren, stijl)" value={data.visuelIdentiteit} />
+            <IconDataCard icon="🗣️" label="Tone of voice" value={data.toneOfVoice} />
+            <IconDataCard icon="✅" label="Consistentie van branding" value={data.consistentieBranding} />
+            <IconDataCard icon="💡" label="Waarden en missie" value={data.waardenMissie} />
+            <IconDataCard icon="📍" label="Huidige positionering" value={data.huidigePositionering} />
+          </div>
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
 
-    function PageKanaalstrategie({ data }) {
+    function PageKanaalstrategie({ data, insights = [] }) {
       return (
-        <div className="fade-in">
-          <DCard letter="C" title="Kanaalstrategie">
-            <DataRow label="Actieve platformen" value={data.actievePlatformen} />
-            <DataRow label="Strategische onderbouwing per platform" value={data.onderbouwingPerPlatform} />
-            <DataRow label="Primair kanaal" value={data.primairKanaal} />
-            <DataRow label="Ontbrekende kanalen" value={data.ontbrekendeKanalen} />
-          </DCard>
+        <div className="fade-in space-y-3">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">C</span>
+            <h4 className="text-sm font-semibold text-gray-800">Kanaalstrategie</h4>
+          </div>
+          <div className="bg-blue-50 rounded-2xl p-3 space-y-2">
+            <IconDataCard icon="📱" label="Actieve platformen" value={data.actievePlatformen} asTags />
+            <IconDataCard icon="📝" label="Strategische onderbouwing per platform" value={data.onderbouwingPerPlatform} />
+            <IconDataCard icon="⭐" label="Primair kanaal" value={data.primairKanaal} />
+            <IconDataCard icon="🔍" label="Ontbrekende kanalen" value={data.ontbrekendeKanalen} />
+          </div>
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
 
-    function PageDoelgroep({ data }) {
+    function PageDoelgroep({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-4">
-          <DCard letter="D" title="Doelgroep (huidige)">
-            <DataRow label="Wie volgt het merk nu?" value={data.wieVolgt} />
-            <DataRow label="Leeftijd / interesses" value={data.leeftijdInteresses} />
-            <DataRow label="Gedrag" value={data.gedrag} />
-            <DataRow label="Engagement" value={data.engagement} />
-            <DataRow label="Community interactie" value={data.communityInteractie} />
-          </DCard>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">D</span>
+            <h4 className="text-sm font-semibold text-gray-800">Doelgroep (huidige)</h4>
+          </div>
+          <div className="bg-amber-50 rounded-2xl p-3 space-y-2">
+            <IconDataCard icon="👁️" label="Wie volgt het merk nu?" value={data.wieVolgt} />
+            <IconDataCard icon="🎯" label="Leeftijd / interesses" value={data.leeftijdInteresses} />
+            <IconDataCard icon="🔄" label="Gedrag" value={data.gedrag} />
+            <IconDataCard icon="💬" label="Engagement" value={data.engagement} />
+            <IconDataCard icon="🤝" label="Community interactie" value={data.communityInteractie} />
+          </div>
           {/* Visuele vergelijking: gewenst vs werkelijk */}
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl p-4 border-2 border-blue-100 bg-blue-50">
@@ -463,11 +738,12 @@
               Blauw = wie je wil bereiken · Oranje = wie je nu bereikt
             </p>
           )}
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
 
-    function PageContentanalyse({ data }) {
+    function PageContentanalyse({ data, insights = [] }) {
       const formatColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b'];
       return (
         <div className="fade-in space-y-4">
@@ -490,24 +766,32 @@
           <DCard title="Performance (gemiddelden)">
             <PerformancePanel data={data} />
           </DCard>
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
 
-    function PageStrategischeContent({ data }) {
+    function PageStrategischeContent({ data, insights = [] }) {
       const items = [
-        { label: 'Positioneringsconsistentie', value: data.positioneringsconsistentie },
-        { label: 'Tone of voice',              value: data.toneOfVoice },
-        { label: 'Storytelling',               value: data.storytelling },
-        { label: 'Emotie',                     value: data.emotie },
-        { label: 'Doelgroepresonantie',        value: data.doelgroepresonantie },
-        { label: 'Formatstrategie',            value: data.formatstrategie },
+        { icon: '🎯', label: 'Positioneringsconsistentie', value: data.positioneringsconsistentie },
+        { icon: '🗣️', label: 'Tone of voice',              value: data.toneOfVoice },
+        { icon: '📖', label: 'Storytelling',               value: data.storytelling },
+        { icon: '❤️', label: 'Emotie',                     value: data.emotie },
+        { icon: '🎪', label: 'Doelgroepresonantie',        value: data.doelgroepresonantie },
+        { icon: '📐', label: 'Formatstrategie',            value: data.formatstrategie },
       ];
       return (
-        <div className="fade-in">
-          <DCard letter="G" title="Strategische contentanalyse">
-            {items.map((item, i) => <DataRow key={i} label={item.label} value={item.value} />)}
-          </DCard>
+        <div className="fade-in space-y-3">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">G</span>
+            <h4 className="text-sm font-semibold text-gray-800">Strategische contentanalyse</h4>
+          </div>
+          <div className="bg-teal-50 rounded-2xl p-3 space-y-2">
+            {items.map((item, i) => (
+              <IconDataCard key={i} icon={item.icon} label={item.label} value={item.value} />
+            ))}
+          </div>
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
@@ -529,7 +813,7 @@
       // max = 6, normalize to 0-100
       const pct = Math.min(100, Math.round((rawScore / 6) * 100));
       const label = pct < 25 ? 'Publiek' : pct < 50 ? 'Emerging community' : pct < 75 ? 'Actieve community' : 'Echte community';
-      const color = pct < 25 ? '#9ca3af' : pct < 50 ? '#f59e0b' : pct < 75 ? '#3b82f6' : '#10b981';
+      const color = pct < 40 ? '#ef4444' : pct <= 70 ? '#f59e0b' : '#10b981';
 
       return (
         <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
@@ -557,37 +841,47 @@
       );
     }
 
-    function PageCommunity({ data }) {
+    function PageCommunity({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-4">
-          <DCard letter="H" title="Community analyse">
-            <DataRow label="Interactie in comments" value={data.interactieComments} />
-            <DataRow label="DM interacties" value={data.dmInteracties} />
-          </DCard>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">H</span>
+            <h4 className="text-sm font-semibold text-gray-800">Community analyse</h4>
+          </div>
+          <div className="bg-emerald-50 rounded-2xl p-3 space-y-2">
+            <IconDataCard icon="💬" label="Interactie in comments" value={data.interactieComments} />
+            <IconDataCard icon="📩" label="DM interacties" value={data.dmInteracties} />
+            <IconDataCard icon="🏘️" label="Publiek of echte community?" value={data.publiefOfCommunity} />
+          </div>
           <DCard title="Community betrokkenheid">
-            <p className="text-xs text-gray-400 mb-2">Terugkerende fans</p>
-            <TagList text={data.terugkerendeFans} />
-            <p className="text-xs text-gray-400 mt-4 mb-2">User generated content</p>
-            <TagList text={data.userGeneratedContent} />
-            <p className="text-xs text-gray-400 mt-4 mb-2">Community betrokkenheid</p>
-            <TagList text={data.communityBetrokkenheid} />
-          </DCard>
-          <DCard title="Publiek of echte community?">
-            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-              {data.publiefOfCommunity || <span className="text-gray-300 italic">—</span>}
-            </p>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">👥 Terugkerende fans</p>
+                <TagList text={data.terugkerendeFans} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">✍️ User generated content</p>
+                <TagList text={data.userGeneratedContent} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">🤝 Community betrokkenheid</p>
+                <TagList text={data.communityBetrokkenheid} />
+              </div>
+            </div>
           </DCard>
           <CommunityMeter data={data} />
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
 
-    function PageMiddelen({ data }) {
+    function PageMiddelen({ data, insights = [] }) {
       return (
-        <div className="fade-in">
+        <div className="fade-in space-y-3">
           <DCard letter="I" title="Middelen (resources)">
             <MiddelenGrid data={data} />
           </DCard>
+          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
         </div>
       );
     }
@@ -659,60 +953,274 @@
 
     function PageSamenwerkingen({ data }) {
       return (
-        <div className="fade-in">
-          <DCard letter="B" title="Samenwerkingen en netwerk">
-            <DataRow label="Potentiële partners" value={data.potentielePartners} />
-            <DataRow label="Gatekeepers in de scene" value={data.gatekeepers} />
-            <DataRow label="Bestaande samenwerkingen en resultaten" value={data.bestaandeSamenwerkingen} />
-            <DataRow label="Ontbrekende samenwerkingen" value={data.ontbrekendeSamenwerkingen} />
-          </DCard>
+        <div className="fade-in space-y-3">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">B</span>
+            <h4 className="text-sm font-semibold text-gray-800">Samenwerkingen en netwerk</h4>
+          </div>
+          <div className="bg-purple-50 rounded-2xl p-3 space-y-2">
+            <IconDataCard icon="🤝" label="Potentiële partners" value={data.potentielePartners} asTags />
+            <IconDataCard icon="🔑" label="Gatekeepers in de scene" value={data.gatekeepers} asTags />
+            <IconDataCard icon="✅" label="Bestaande samenwerkingen en resultaten" value={data.bestaandeSamenwerkingen} />
+            <IconDataCard icon="🔍" label="Ontbrekende samenwerkingen" value={data.ontbrekendeSamenwerkingen} />
+          </div>
         </div>
       );
     }
 
     function PageMarkt({ data }) {
       return (
-        <div className="fade-in">
-          <DCard letter="C" title="Markt / scene analyse">
-            <DataRow label="Grootte van de scene" value={data.grootteScene} />
-            <DataRow label="Populariteit van het genre" value={data.populariteitGenre} />
-            <DataRow label="Aantal events" value={data.aantalEvents} />
-            <DataRow label="Andere labels / collectieven" value={data.andereLabels} />
-            <DataRow label="Marktverzadiging" value={data.marktverzadiging} />
-          </DCard>
+        <div className="fade-in space-y-3">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">C</span>
+            <h4 className="text-sm font-semibold text-gray-800">Markt / scene analyse</h4>
+          </div>
+          <div className="bg-orange-50 rounded-2xl p-3 space-y-2">
+            <IconDataCard icon="📊" label="Grootte van de scene" value={data.grootteScene} />
+            <IconDataCard icon="🎵" label="Populariteit van het genre" value={data.populariteitGenre} />
+            <IconDataCard icon="🎟️" label="Aantal events" value={data.aantalEvents} />
+            <IconDataCard icon="🏢" label="Andere labels / collectieven" value={data.andereLabels} asTags />
+            <IconDataCard icon="⚖️" label="Marktverzadiging" value={data.marktverzadiging} />
+          </div>
         </div>
       );
     }
 
     function PageDoelgroepgedrag({ data }) {
       return (
-        <div className="fade-in">
-          <DCard letter="D" title="Doelgroepgedrag">
-            <DataRow label="Hoe ontdekken ze muziek?" value={data.ontdekkingMuziek} />
-            <DataRow label="Welke platformen gebruiken ze?" value={data.platformgebruik} />
-            <DataRow label="Wat motiveert hen?" value={data.motivatie} />
-            <DataRow label="Wie beïnvloedt hen?" value={data.invloeden} />
-          </DCard>
+        <div className="fade-in space-y-3">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">D</span>
+            <h4 className="text-sm font-semibold text-gray-800">Doelgroepgedrag</h4>
+          </div>
+          <div className="bg-sky-50 rounded-2xl p-3 space-y-2">
+            <IconDataCard icon="🔍" label="Hoe ontdekken ze muziek?" value={data.ontdekkingMuziek} />
+            <IconDataCard icon="📱" label="Welke platformen gebruiken ze?" value={data.platformgebruik} />
+            <IconDataCard icon="💫" label="Wat motiveert hen?" value={data.motivatie} />
+            <IconDataCard icon="👥" label="Wie beïnvloedt hen?" value={data.invloeden} />
+          </div>
         </div>
       );
     }
 
     function PageCultureleTrends({ data }) {
-      const items = [
-        { label: 'Stijgende populariteit van een genre', value: data.genrePopulariteit },
-        { label: 'Nostalgie trends',                     value: data.nostalgieTrends },
-        { label: 'DIY cultuur',                          value: data.diyCultuur },
-        { label: 'Authenticiteit vs commercialisering',  value: data.authenticiteitVsCommercialisering },
+      const trendDir = (text) => {
+        if (!text) return { icon: '→', color: 'text-gray-400' };
+        const t = text.toLowerCase();
+        if (/groei|stijg|toename|opkomst|populairder|meer\b|toeneem/.test(t)) return { icon: '↑', color: 'text-emerald-500' };
+        if (/dal|daalt|afname|achteruit|minder\b|verdwijnt|afneem/.test(t))   return { icon: '↓', color: 'text-red-500' };
+        return { icon: '→', color: 'text-gray-400' };
+      };
+      const trends = [
+        { icon: '🎵', label: 'Stijgende populariteit van een genre', value: data.genrePopulariteit },
+        { icon: '🕰️', label: 'Nostalgie trends',                     value: data.nostalgieTrends },
+        { icon: '🛠️', label: 'DIY cultuur',                          value: data.diyCultuur },
+        { icon: '⚖️', label: 'Authenticiteit vs commercialisering',  value: data.authenticiteitVsCommercialisering },
       ];
       return (
-        <div className="fade-in">
-          <DCard letter="E" title="Culturele trends">
-            {items.map((item, i) => <DataRow key={i} label={item.label} value={item.value} />)}
-          </DCard>
+        <div className="fade-in space-y-3">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">E</span>
+            <h4 className="text-sm font-semibold text-gray-800">Culturele trends</h4>
+          </div>
+          <div className="bg-rose-50 rounded-2xl p-3 space-y-2">
+            {trends.map((trend, i) => {
+              const dir = trendDir(trend.value);
+              const badge = detectBadge(trend.value);
+              const empty = !trend.value || !String(trend.value).trim();
+              return (
+                <div key={i} className="bg-white border border-gray-100 rounded-xl p-4">
+                  <div className="flex items-start gap-2.5 mb-2">
+                    <span className="text-sm shrink-0 leading-none mt-0.5">{trend.icon}</span>
+                    <span className="text-xs font-semibold text-gray-500 flex-1 leading-snug">{trend.label}</span>
+                    <span className={`text-base font-bold shrink-0 ${dir.color}`}>{dir.icon}</span>
+                    {badge && !empty && <BadgePill {...badge} />}
+                  </div>
+                  {empty
+                    ? <p className="text-sm text-gray-300 italic pl-7">—</p>
+                    : <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed pl-7">{trend.value}</p>
+                  }
+                </div>
+              );
+            })}
+          </div>
         </div>
       );
     }
 
+
+// ─── Samenvatting page ────────────────────────────────────────────────────
+    function PageSamenvatting({ analysis, allInsights = [] }) {
+      const { interneAnalyse: int, externeAnalyse: ext } = analysis;
+      const ca = int.contentanalyse;
+      const comm = int.communityAnalyse;
+      const swot = int.swot;
+
+      // Community score
+      const communityPct = computeCommunityScore(comm);
+      const commC = communityScoreColor(communityPct);
+      const commLabel = communityPct < 25 ? 'Publiek' : communityPct < 50 ? 'Emerging community' : communityPct < 75 ? 'Actieve community' : 'Echte community';
+
+      // Engagement rate
+      const erStr = ca.gemiddeldeEngagementRate;
+      const erNum = parseEngagementRate(erStr);
+      const erC = engagementRateColor(erNum);
+
+      // Contentmix dominant
+      const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
+      const mixLabels = ['Promo','Behind the scenes','Community','Storytelling','Events','Memes / cultuur'];
+      const counts = mixKeys.map(k => Number(ca[k]) || 0);
+      const total = counts.reduce((a, b) => a + b, 0);
+      let dominantLabel = null, dominantPct = 0;
+      if (total > 0) {
+        const maxIdx = counts.indexOf(Math.max(...counts));
+        dominantPct = Math.round((counts[maxIdx] / total) * 100);
+        dominantLabel = mixLabels[maxIdx];
+      }
+
+      // Doelgroep
+      const gewenst = (int.doelgroep.gewensteDoelgroep || '').trim();
+      const werkelijk = (int.doelgroep.werkelijkeDoelgroep || '').trim();
+      const bothFilled = gewenst && werkelijk;
+      const mismatch = bothFilled && gewenst.toLowerCase() !== werkelijk.toLowerCase();
+
+      // SWOT top 2
+      const top2Lines = (text) => {
+        if (!text || !String(text).trim()) return [];
+        return String(text).split('\n').map(l => l.replace(/^[\s\-•*\d.]+/, '').trim()).filter(Boolean).slice(0, 2);
+      };
+      const topStrengths = top2Lines(swot.strengths);
+      const topThreats = top2Lines(swot.threats);
+
+      // Gaps
+      const reelsPct = (() => {
+        const v = ca.formatsReels;
+        if (!v || typeof v !== 'object') return 0;
+        const n = parseFloat(String(v.percentage || '').replace('%','').replace(',','.'));
+        return isNaN(n) ? 0 : n;
+      })();
+      const ontbKanalen = (int.kanaalstrategie?.ontbrekendeKanalen || '').trim();
+      const ontbSamenw = (ext.samenwerkingen?.ontbrekendeSamenwerkingen || '').trim();
+
+      const gaps = [];
+      if (communityPct < 50) gaps.push({ text: 'Community-opbouw vereist aandacht', type: 'warn' });
+      if (mismatch) gaps.push({ text: 'Kloof tussen gewenst en werkelijk publiek gedetecteerd', type: 'warn' });
+      if (reelsPct < 20 && erNum !== null && erNum < 5) gaps.push({ text: 'Reels onderbenut terwijl engagement laag is — overweeg meer videoformats', type: 'warn' });
+      if (ontbKanalen) gaps.push({ text: ontbKanalen, type: 'gap', label: 'Ontbrekende kanalen' });
+      if (ontbSamenw) gaps.push({ text: ontbSamenw, type: 'gap', label: 'Ontbrekende samenwerkingen' });
+
+      return (
+        <div className="fade-in space-y-4">
+          {/* Key metrics */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className={`${commC.bg} border ${commC.border} rounded-xl p-4`}>
+              <p className="text-xs font-medium text-gray-500 mb-2">Community score</p>
+              <p className={`text-3xl font-bold ${commC.text}`}>{communityPct}%</p>
+              <p className={`text-xs font-semibold mt-1 ${commC.text}`}>{commLabel}</p>
+            </div>
+            <div className={`${erC.bg} border ${erC.border} rounded-xl p-4`}>
+              <p className="text-xs font-medium text-gray-500 mb-2">Engagement rate</p>
+              <p className={`text-3xl font-bold ${erC.text}`}>{erStr || '—'}</p>
+              {erC.label && <p className={`text-xs font-semibold mt-1 ${erC.text}`}>{erC.label}</p>}
+            </div>
+          </div>
+
+          {/* Contentmix */}
+          {total > 0 && (
+            <DCard title="Contentmix">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Dominante categorie</p>
+                  <p className="text-sm font-semibold text-gray-900">{dominantLabel}</p>
+                </div>
+                <div className="text-right">
+                  <p className={`text-2xl font-bold ${dominantPct > 60 ? 'text-amber-500' : 'text-gray-800'}`}>{dominantPct}%</p>
+                  {dominantPct > 60 && <p className="text-xs text-amber-500 font-medium">⚠ Te weinig variatie</p>}
+                </div>
+              </div>
+            </DCard>
+          )}
+
+          {/* Doelgroep vergelijking */}
+          {bothFilled && (
+            <DCard title="Doelgroep">
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="rounded-lg p-3 bg-blue-50 border border-blue-100">
+                  <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">Gewenst</p>
+                  <p className="text-xs text-gray-700 leading-relaxed">{gewenst}</p>
+                </div>
+                <div className="rounded-lg p-3 bg-amber-50 border border-amber-100">
+                  <p className="text-xs font-bold text-amber-500 uppercase tracking-wide mb-1">Werkelijk</p>
+                  <p className="text-xs text-gray-700 leading-relaxed">{werkelijk}</p>
+                </div>
+              </div>
+              {mismatch && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                  <span className="text-orange-400 text-sm">⚠</span>
+                  <p className="text-xs text-orange-600 font-medium">Doelgroep wijkt af van gewenst publiek</p>
+                </div>
+              )}
+            </DCard>
+          )}
+
+          {/* SWOT highlights */}
+          {(topStrengths.length > 0 || topThreats.length > 0) && (
+            <div className="grid grid-cols-2 gap-3">
+              {topStrengths.length > 0 && (
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+                  <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide mb-3">Top sterktes</p>
+                  <ul className="space-y-2">
+                    {topStrengths.map((s, i) => (
+                      <li key={i} className="text-xs text-gray-700 flex gap-2">
+                        <span className="text-emerald-400 shrink-0 font-bold">✓</span>
+                        <span className="leading-relaxed">{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {topThreats.length > 0 && (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                  <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-3">Top bedreigingen</p>
+                  <ul className="space-y-2">
+                    {topThreats.map((t, i) => (
+                      <li key={i} className="text-xs text-gray-700 flex gap-2">
+                        <span className="text-amber-400 shrink-0 font-bold">!</span>
+                        <span className="leading-relaxed">{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Gaps sectie */}
+          {gaps.length > 0 ? (
+            <DCard title="Gedetecteerde gaps">
+              <div className="space-y-3">
+                {gaps.map((gap, i) => (
+                  <div key={i} className="flex gap-3 items-start">
+                    <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${gap.type === 'warn' ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
+                      {gap.type === 'warn' ? '!' : '→'}
+                    </span>
+                    <div>
+                      {gap.label && <p className="text-xs font-semibold text-gray-500 mb-0.5">{gap.label}</p>}
+                      <p className="text-sm text-gray-700 leading-relaxed">{gap.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DCard>
+          ) : (
+            <div className="text-center py-6 text-gray-400">
+              <p className="text-sm italic">Geen gaps gedetecteerd op basis van de huidige data.</p>
+            </div>
+          )}
+          <InzichtenBlok insights={allInsights} />
+        </div>
+      );
+    }
 
 // ─── Dashboard Screen ─────────────────────────────────────────────────────
     const INTERNE_TABS = [
@@ -760,10 +1268,20 @@
     }
 
     function DashboardScreen({ analysis, onBack, onEdit }) {
-      const [mainTab, setMainTab] = useState('interne');
+      const [mainTab, setMainTab] = useState('samenvatting');
       const [interneTab, setInterneTab] = useState('organisatie');
       const [externeTab, setExterneTab] = useState('concurrentie');
+      const [showExportMenu, setShowExportMenu] = useState(false);
+      const exportMenuRef = useRef();
       const { interneAnalyse: int, externeAnalyse: ext } = analysis;
+      const insights = detectInsights(analysis);
+
+      useEffect(() => {
+        if (!showExportMenu) return;
+        const handler = (e) => { if (!exportMenuRef.current?.contains(e.target)) setShowExportMenu(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+      }, [showExportMenu]);
 
       const handleMainTab = (tab) => {
         setMainTab(tab);
@@ -771,15 +1289,16 @@
       };
 
       const renderInternePage = () => {
+        const pi = (id) => insights.filter(i => i.pages.includes(id));
         switch (interneTab) {
           case 'organisatie':     return <PageOrganisatie data={int.organisatie} />;
-          case 'merkidentiteit':  return <PageMerkidentiteit data={int.merkidentiteit} />;
-          case 'kanaalstrategie': return <PageKanaalstrategie data={int.kanaalstrategie || {}} />;
-          case 'doelgroep':       return <PageDoelgroep data={int.doelgroep} />;
-          case 'contentanalyse':  return <PageContentanalyse data={int.contentanalyse} />;
-          case 'strategisch':     return <PageStrategischeContent data={int.strategischeContent} />;
-          case 'community':       return <PageCommunity data={int.communityAnalyse} />;
-          case 'middelen':        return <PageMiddelen data={int.middelen} />;
+          case 'merkidentiteit':  return <PageMerkidentiteit data={int.merkidentiteit} insights={pi('merkidentiteit')} />;
+          case 'kanaalstrategie': return <PageKanaalstrategie data={int.kanaalstrategie || {}} insights={pi('kanaalstrategie')} />;
+          case 'doelgroep':       return <PageDoelgroep data={int.doelgroep} insights={pi('doelgroep')} />;
+          case 'contentanalyse':  return <PageContentanalyse data={int.contentanalyse} insights={pi('contentanalyse')} />;
+          case 'strategisch':     return <PageStrategischeContent data={int.strategischeContent} insights={pi('strategisch')} />;
+          case 'community':       return <PageCommunity data={int.communityAnalyse} insights={pi('community')} />;
+          case 'middelen':        return <PageMiddelen data={int.middelen} insights={pi('middelen')} />;
           case 'swot':            return <PageSwot data={int.swot} />;
           default:                return null;
         }
@@ -813,17 +1332,37 @@
                   <p className="text-xs text-gray-400">{formatDate(analysis.datum)}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => exportAnalysis(analysis)}
-                    className="inline-flex items-center gap-1.5 text-xs text-gray-500 border border-gray-200 bg-white px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round"/>
-                      <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round"/>
-                      <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round"/>
-                    </svg>
-                    Export
-                  </button>
+                  {/* Split export button */}
+                  <div ref={exportMenuRef} className="relative">
+                    <div className="flex items-center border border-gray-200 bg-white rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => exportPDF(analysis)}
+                        className="inline-flex items-center gap-1.5 text-xs text-gray-500 px-3 py-1.5 hover:bg-gray-50 transition-colors border-r border-gray-200"
+                      >
+                        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round"/>
+                          <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round"/>
+                          <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round"/>
+                        </svg>
+                        PDF
+                      </button>
+                      <button
+                        onClick={() => setShowExportMenu(m => !m)}
+                        className="text-gray-400 px-2 py-1.5 hover:bg-gray-50 transition-colors text-xs"
+                        aria-label="Meer exportopties"
+                      >▾</button>
+                    </div>
+                    {showExportMenu && (
+                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-max">
+                        <button
+                          onClick={() => { exportAnalysis(analysis); setShowExportMenu(false); }}
+                          className="w-full text-left text-xs text-gray-600 px-4 py-2 hover:bg-gray-50 transition-colors"
+                        >
+                          JSON exporteren
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={onEdit}
                     className="inline-flex items-center gap-1.5 text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-700 transition-colors"
@@ -840,8 +1379,9 @@
               {/* Main tabs */}
               <div className="flex gap-1 mt-3">
                 {[
-                  { id: 'interne',  label: 'Interne Analyse' },
-                  { id: 'externe',  label: 'Externe Analyse' },
+                  { id: 'samenvatting', label: 'Samenvatting' },
+                  { id: 'interne',      label: 'Interne Analyse' },
+                  { id: 'externe',      label: 'Externe Analyse' },
                 ].map(t => (
                   <button
                     key={t.id}
@@ -856,19 +1396,22 @@
             </div>
           </div>
 
-          {/* Sub-tab bar */}
-          <div className="bg-white border-b border-gray-100">
-            <div className="max-w-2xl mx-auto px-4 py-2">
-              {mainTab === 'interne'
-                ? <SubTabBar tabs={INTERNE_TABS} active={interneTab} onChange={setInterneTab} />
-                : <SubTabBar tabs={EXTERNE_TABS} active={externeTab} onChange={setExterneTab} />
-              }
+          {/* Sub-tab bar — alleen bij interne/externe */}
+          {mainTab !== 'samenvatting' && (
+            <div className="bg-white border-b border-gray-100">
+              <div className="max-w-2xl mx-auto px-4 py-2">
+                {mainTab === 'interne'
+                  ? <SubTabBar tabs={INTERNE_TABS} active={interneTab} onChange={setInterneTab} />
+                  : <SubTabBar tabs={EXTERNE_TABS} active={externeTab} onChange={setExterneTab} />
+                }
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Content */}
           <div className="max-w-2xl mx-auto px-4 py-6">
-            {mainTab === 'interne' ? renderInternePage() : renderExternePage()}
+            {mainTab === 'samenvatting' ? <PageSamenvatting analysis={analysis} allInsights={insights} /> :
+             mainTab === 'interne' ? renderInternePage() : renderExternePage()}
           </div>
         </div>
       );
