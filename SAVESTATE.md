@@ -2,7 +2,7 @@
 
 ## Laatste opslag
 **Datum:** 2026-03-20
-**Commit hash:** `bcc81fb` *(zie ook: d56e7a0, efddfbb)*
+**Commit hash:** `c6c1390` *(zie ook: e23b27d, 71420a7, dd6ca65, bcc81fb)*
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
 
@@ -10,33 +10,43 @@
 
 ## Samenvatting recente wijzigingen
 
-### Commit efddfbb — 5 feedbackverbeteringen
-1. **Score-tooltips** — Vraagtekenicoontje (?) naast engagement rate, community score en gekleurde badges; bij hover verschijnt uitleg van drempelwaarden
-2. **Insights fix (ronde 1)** — "mainstream" toegevoegd als internationale ambitie; budget drempel €500; emotie/resonantie per veld gecheckt
-3. **Inzichten bovenaan subpagina's** — InsightCards staan nu helemaal bovenaan op alle 7 subpagina's (vóór de data)
-4. **SVG organogram** — Clean boomstructuur: lead-node bovenaan, teamleden in eigen nodes, gestippelde lijn naar rollen/beslissingsproces
-5. **Kleurcodering scores** — Engagement rate en community score uitgelegd via tooltip
-
-### Commit d56e7a0 — Insights bugfix + 5 nieuwe verbindingen
-6. **Bugfix verbindingen** — Alle 9 inzichten geëvalueerd via onafhankelijke try/catch blokken; geen vroeg afbreken meer
-7. **Inzicht 5: Frequentie vs engagement** — >5 posts/week + engagement <5% → rood (urgent)
-8. **Inzicht 6: Concurrentie gap** — "Wat doen zij niet" matcht positionering → blauw (kans)
-9. **Inzicht 7: UGC vs community** — Weinig UGC + community score >60% → blauw (kans)
-10. **Inzicht 8: Markt vs middelen** — Verzadigde markt + budget <€500 → rood (urgent)
-11. **Inzicht 9: Groeiende trend vs contentmix** — Stijgende trend + categorie <10% → blauw (kans)
-12. **InsightCard kleuren** — Oranje = spanning, Blauw = kans, Rood = urgent
-13. **Inzichtenteller** — "N inzichten gedetecteerd" bovenaan blok met kleurcodering (grijs/amber/rood)
-
 ### Commit bcc81fb — UX verbeteringen ronde 2
-14. **getEngagementRate() helper** — Berekent ER via Instagram Insights (bereik) of indicatief (volgers); valt terug op manueel veld
-15. **insightsAccess keuze (ja/nee)** — Radiobuttons in formulier; "ja" toont bereik-veld, "nee" toont volgers-veld; live ER-preview zodra data ingevuld
-16. **ER-bronvermelding** — "Berekend via Instagram Insights" of "Indicatieve score" onder ER-kaart op dashboard en samenvatting
-17. **Formats instructietekst** — "Geef het aantal posts per format in van je laatste 30 posts." bovenaan sectie
-18. **Formats <30 waarschuwing** — Oranje waarschuwing wanneer totaal posts < 30
-19. **Formats dashboard disclaimer** — Grijze tekst "Gebaseerd op X posts — aantallen omgezet naar percentages" onder format-balken
-20. **Frequentie gecombineerde lijn** — Dashboard toont "Gemiddeld X posts/week en Y stories/week — gebaseerd op de laatste 4 weken"
-21. **Inzicht 9: Dynamische trendnaam** — Noemt specifieke gedetecteerde trend (genre-populariteit, nostalgie-trend, etc.)
-22. **PDF export** — Inline ER-berekening op basis van insightsAccess bij exporteren
+1. **getEngagementRate() helper** — Berekent ER via Instagram Insights (bereik) of indicatief (volgers)
+2. **insightsAccess keuze (ja/nee)** — Radiobuttons; conditionele velden; live ER-preview
+3. **ER-bronvermelding** — "Berekend via Instagram Insights" of "Indicatieve score" op dashboard
+4. **Formats instructietekst + <30 waarschuwing + dashboard disclaimer**
+5. **Frequentie gecombineerde dashboardlijn** — "Gemiddeld X posts/week en Y stories/week"
+6. **Inzicht 9: Dynamische trendnaam** — Noemt specifieke gedetecteerde trend
+7. **PDF export** — Inline ER-berekening op basis van insightsAccess
+
+### Commit dd6ca65 — 4 bugfixes invoerflow
+8. **Frequentie info-kadertje** — Blauw kader met instructietekst + vraagteken-tooltip
+9. **GroupLabel tooltip-prop** — Frequentie-sectie krijgt uitleg posts vs stories
+10. **ER dashboard/samenvatting geblokkeerd** — Placeholder zolang bereik/volgers ontbreekt
+11. **Concurrent engagement** — Vrij tekstveld vervangen door likes+comments+volgers + auto ER
+
+### Commit 71420a7 — Manueel ER-veld volledig verwijderd
+12. **gemiddeldeEngagementRate** — Verwijderd uit emptyData, migratie, helper, formulier en PDF
+13. **getEngagementRate()** — Geeft alleen nog waarde bij volledig ingevulde auto-berekening
+14. **erMissing = !erStr** — Dekt alle gevallen: geen keuze, ontbrekend veld, geen data
+
+### Commit e23b27d — Concurrent frequentie + performance sectie
+15. **emptyCompetitor** — postsAantal, storiesAantal, engagementShares toegevoegd
+16. **Formulier** — Frequentie-kadertje + posts/stories + ≈/week + performance grid (4 velden)
+17. **Auto ER-preview** — Placeholder zolang likes, comments of volgers ontbreekt
+18. **Dashboard tabel** — Posts/week en Stories/week rijen toegevoegd
+19. **PDF export** — Posts/week en Stories/week kolommen in concurrent-tabel
+
+### Commit c6c1390 — Persona Creator + AI SWOT via Anthropic API
+20. **callAnthropicAPI()** — Directe browser-fetch naar claude-sonnet-4-20250514
+21. **Persona's tab** — Nieuwe tab (laatste); auto-generatie bij eerste bezoek
+22. **PersonaCard** — Naam, leeftijd, bio, quote, motivaties, frustraties, mediagebruik, koopgedrag
+23. **Refresh per persona** — ↻ knop per kaart hergenereert alleen die persona
+24. **AI SWOT** — Parallelle SWOT naast handmatige; side-by-side met SwotBlockNarrow
+25. **Vergelijkingsnoot** — Max 3 punten met grootste verschillen tussen beide SWOT's
+26. **API sleutel** — Opgeslagen in localStorage (ma_apikey); setup-scherm bij eerste gebruik
+27. **Error handling** — Rode foutmelding + "Opnieuw" knop bij alle AI-functies
+28. **Persistentie** — personas en aiSwot opgeslagen in analyseobject; bewaard na herstart
 
 ---
 
@@ -49,20 +59,20 @@
 - Multi-client analyse beheer (aanmaken, opslaan, openen, verwijderen)
 - PDF export (print-dialoog) + JSON export/import
 - Samenvattingspagina als standaard eerste tab
-- Interne analyse: Organisatie (met SVG OrgChart), Merkidentiteit, Kanaalstrategie, Doelgroep, Content, Strategie, Community, Middelen, SWOT
-- Externe analyse: Concurrentie (multi, scrollbare tabel), Samenwerkingen, Markt/Scene, Doelgroepgedrag, Culturele trends (met richtingspijlen)
-- Dashboard: gekleurde badges + tooltips, IconDataCards, tag-chips, SVG organogram, performance metrics
+- Interne analyse: Organisatie (SVG OrgChart), Merkidentiteit, Kanalen, Doelgroep, Content, Strategie, Community, Middelen, SWOT
+- Externe analyse: Concurrentie (multi + frequentie/performance per concurrent), Samenwerkingen, Markt/Scene, Doelgroepgedrag, Trends
+- Dashboard: badges + tooltips, IconDataCards, tag-chips, SVG organogram, performance metrics
 - Visueel: donut contentmix, format-balken, doelgroep vergelijking, community score-meter
 - Automatische inzichten: 9 data-verbindingen, 3 kleurtypen, teller bovenaan
-- Score-tooltips: engagement rate, community score, badge-legenda
-- Inzichten prominent bovenaan elke subpagina
+- Engagement rate: uitsluitend automatisch berekend (Insights/bereik of publiek/volgers)
+- Concurrent ER: automatisch via publieke formule (likes + comments) / volgers
+- Persona Creator: 2 AI-persona's via Anthropic API, per persona refresh-knop
+- AI SWOT: parallelle analyse naast handmatige SWOT met vergelijkingsnoot
 - LocalStorage persistentie met automatische migratie
-- Formats: count-based invoer (laatste 30 posts), auto-percentageberekening, <30 waarschuwing
-- Frequentie: twee numerieke velden (posts + stories, laatste 4 weken), auto-weekgemiddelde
-- Engagement rate: automatische berekening via Instagram Insights (bereik) of indicatief (volgers)
 
 ### Tech stack
 - React 18 (UMD via unpkg)
 - Tailwind CSS (CDN)
 - Babel Standalone (JSX in browser)
+- Anthropic API (claude-sonnet-4-20250514, directe browser-fetch)
 - Geen build tool, geen dependencies
