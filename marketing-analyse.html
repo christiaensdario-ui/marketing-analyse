@@ -28,7 +28,7 @@
 
     // ─── Data structure ───────────────────────────────────────────────────────
     const emptyFormat = () => ({ count: '', uitleg: '', voorbeelden: '' });
-    const emptyCompetitor = () => ({ naam: '', positionering: '', branding: '', content: '', community: '', engagementLikes: '', engagementComments: '', engagementVolgers: '', differentiatie: '', watDoenZijNiet: '' });
+    const emptyCompetitor = () => ({ naam: '', positionering: '', branding: '', content: '', community: '', postsAantal: '', storiesAantal: '', engagementLikes: '', engagementComments: '', engagementShares: '', engagementVolgers: '', differentiatie: '', watDoenZijNiet: '' });
 
     const emptyData = () => ({
       interneAnalyse: {
@@ -238,7 +238,9 @@
       const competitors = Array.isArray(ext.concurrentieanalyse) ? ext.concurrentieanalyse : [ext.concurrentieanalyse || {}];
       const compErVal = (c) => { const l=parseFloat(String(c.engagementLikes||'').replace(',','.'));const cm=parseFloat(String(c.engagementComments||'').replace(',','.'));const v=parseFloat(String(c.engagementVolgers||'').replace(',','.')); return v>0&&(l+cm)>0?((l+cm)/v*100).toFixed(2)+'% (publieke data)':'—'; };
       const compRows = [['Positionering','positionering'],['Branding','branding'],['Content','content'],['Community','community'],['Differentiatie','differentiatie'],['Wat doen zij NIET?','watDoenZijNiet']];
-      const compTable = `<table><thead><tr><th></th>${competitors.map((c,i)=>`<th>${escHtml(c.naam||`Concurrent ${i+1}`)}</th>`).join('')}</tr></thead><tbody>${compRows.map(([label,key])=>`<tr><td><strong>${label}</strong></td>${competitors.map(c=>`<td>${escHtml(c[key]||'—')}</td>`).join('')}</tr>`).join('')}<tr><td><strong>Engagement (ER)</strong></td>${competitors.map(c=>`<td>${escHtml(compErVal(c))}</td>`).join('')}</tr></tbody></table>`;
+      const compPostsVal = (c) => { const n=Number(c.postsAantal); return n>0?`≈ ${(n/4).toFixed(1).replace('.0','')} per week (${n} in 4 weken)`:'—'; };
+      const compStoriesVal = (c) => { const n=Number(c.storiesAantal); return n>0?`≈ ${(n/4).toFixed(1).replace('.0','')} per week (${n} in 4 weken)`:'—'; };
+      const compTable = `<table><thead><tr><th></th>${competitors.map((c,i)=>`<th>${escHtml(c.naam||`Concurrent ${i+1}`)}</th>`).join('')}</tr></thead><tbody><tr><td><strong>Posts/week</strong></td>${competitors.map(c=>`<td>${escHtml(compPostsVal(c))}</td>`).join('')}</tr><tr><td><strong>Stories/week</strong></td>${competitors.map(c=>`<td>${escHtml(compStoriesVal(c))}</td>`).join('')}</tr>${compRows.map(([label,key])=>`<tr><td><strong>${label}</strong></td>${competitors.map(c=>`<td>${escHtml(c[key]||'—')}</td>`).join('')}</tr>`).join('')}<tr><td><strong>Engagement (ER)</strong></td>${competitors.map(c=>`<td>${escHtml(compErVal(c))}</td>`).join('')}</tr></tbody></table>`;
       const dateStr = new Date(datum).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
       const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><title>${escHtml(klantnaam||'Analyse')}</title><style>
 *{box-sizing:border-box;margin:0;padding:0}@page{margin:2cm;size:A4}body{font-family:-apple-system,Arial,sans-serif;font-size:11px;color:#1f2937;line-height:1.5}
@@ -1233,7 +1235,9 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         { key: 'branding',      label: 'Branding' },
         { key: 'content',       label: 'Content' },
         { key: 'community',     label: 'Community' },
-        { key: null,            label: 'Engagement (ER)', render: c => getCompetitorEngagementRate(c) },
+        { key: null, label: 'Posts/week', render: c => { const n = Number(c.postsAantal); return n > 0 ? `≈ ${(n / 4).toFixed(1).replace('.0','')} per week (${n} in 4 weken)` : ''; } },
+        { key: null, label: 'Stories/week', render: c => { const n = Number(c.storiesAantal); return n > 0 ? `≈ ${(n / 4).toFixed(1).replace('.0','')} per week (${n} in 4 weken)` : ''; } },
+        { key: null, label: 'Engagement (ER)', render: c => getCompetitorEngagementRate(c) },
         { key: 'differentiatie',label: 'Differentiatie' },
         { key: 'watDoenZijNiet',label: 'Wat doen zij NIET?' },
       ];
@@ -2150,57 +2154,74 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                 <Field label="Branding" value={c.branding} onChange={v => setConcurrent(i,'branding',v)} rows={3} />
                 <Field label="Content" value={c.content} onChange={v => setConcurrent(i,'content',v)} rows={3} />
                 <Field label="Community" value={c.community} onChange={v => setConcurrent(i,'community',v)} rows={3} />
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Engagement</p>
-                  <div className="grid grid-cols-3 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Gem. likes</label>
-                      <input
-                        type="number" min="0"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                        placeholder="bijv. 120"
-                        value={c.engagementLikes || ''}
-                        onChange={e => setConcurrent(i, 'engagementLikes', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Gem. comments</label>
-                      <input
-                        type="number" min="0"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                        placeholder="bijv. 15"
-                        value={c.engagementComments || ''}
-                        onChange={e => setConcurrent(i, 'engagementComments', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Aantal volgers</label>
-                      <input
-                        type="number" min="0"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                        placeholder="bijv. 5000"
-                        value={c.engagementVolgers || ''}
-                        onChange={e => setConcurrent(i, 'engagementVolgers', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  {(() => {
-                    const er = getCompetitorEngagementRate(c);
-                    if (!er) return <p className="text-xs text-gray-400 italic">Vul likes, comments en volgers in om de engagement rate te berekenen.</p>;
-                    const erNum = parseEngagementRate(er);
-                    const erc = engagementRateColor(erNum);
-                    return (
-                      <div className={`${erc.bg} border ${erc.border} rounded-xl px-4 py-3 flex items-center justify-between`}>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 mb-0.5">Engagement rate (automatisch berekend)</p>
-                          <p className={`text-lg font-bold ${erc.text}`}>{er}</p>
-                          <p className="text-xs text-gray-400 italic mt-0.5">Berekend op basis van publieke data.</p>
-                        </div>
-                        {erc.label && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>{erc.label}</span>}
-                      </div>
-                    );
-                  })()}
+                <GroupLabel label="Frequentie" />
+                <div className="mb-4 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
+                  <p className="text-xs text-gray-500">Gebaseerd op de laatste 4 weken.</p>
                 </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Aantal posts</label>
+                    <input
+                      type="number" min="0"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                      placeholder="bijv. 20"
+                      value={c.postsAantal || ''}
+                      onChange={e => setConcurrent(i, 'postsAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
+                    />
+                    {Number(c.postsAantal) > 0 && (
+                      <p className="text-xs text-gray-400 mt-1">≈ {(Number(c.postsAantal) / 4).toFixed(1).replace('.0','')} per week</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Aantal stories</label>
+                    <input
+                      type="number" min="0"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                      placeholder="bijv. 28"
+                      value={c.storiesAantal || ''}
+                      onChange={e => setConcurrent(i, 'storiesAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
+                    />
+                    {Number(c.storiesAantal) > 0 && (
+                      <p className="text-xs text-gray-400 mt-1">≈ {(Number(c.storiesAantal) / 4).toFixed(1).replace('.0','')} per week</p>
+                    )}
+                  </div>
+                </div>
+                <GroupLabel label="Performance (gemiddelden)" />
+                <div className="grid grid-cols-2 gap-4 mb-4 mt-3">
+                  {[
+                    { label: 'Gemiddelde likes',    key: 'engagementLikes',    placeholder: 'bijv. 120' },
+                    { label: 'Gemiddelde comments', key: 'engagementComments', placeholder: 'bijv. 15'  },
+                    { label: 'Gemiddelde shares',   key: 'engagementShares',   placeholder: 'bijv. 5'   },
+                    { label: 'Aantal volgers',      key: 'engagementVolgers',  placeholder: 'bijv. 5000' },
+                  ].map(({ label, key, placeholder }) => (
+                    <div key={key}>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                      <input
+                        type="number" min="0"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        placeholder={placeholder}
+                        value={c[key] || ''}
+                        onChange={e => setConcurrent(i, key, e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                {(() => {
+                  const er = getCompetitorEngagementRate(c);
+                  if (!er) return <p className="text-xs text-gray-400 italic mb-4">Vul likes, comments en aantal volgers in om de engagement rate te berekenen.</p>;
+                  const erNum = parseEngagementRate(er);
+                  const erc = engagementRateColor(erNum);
+                  return (
+                    <div className={`${erc.bg} border ${erc.border} rounded-xl px-4 py-3 flex items-center justify-between mb-4`}>
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 mb-0.5">Engagement rate (automatisch berekend)</p>
+                        <p className={`text-xl font-bold ${erc.text}`}>{er}</p>
+                        <p className="text-xs text-gray-400 italic mt-0.5">Berekend op basis van publieke data.</p>
+                      </div>
+                      {erc.label && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>{erc.label}</span>}
+                    </div>
+                  );
+                })()}
                 <Field label="Differentiatie" value={c.differentiatie} onChange={v => setConcurrent(i,'differentiatie',v)} rows={3} />
                 <Field label="Wat doen zij NIET?" hint="Daar zit vaak jouw kans." value={c.watDoenZijNiet} onChange={v => setConcurrent(i,'watDoenZijNiet',v)} rows={3} />
               </div>
