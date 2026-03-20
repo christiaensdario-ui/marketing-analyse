@@ -42,7 +42,7 @@
           formatsFoto: emptyFormat(), formatsVideo: emptyFormat(), formatsReels: emptyFormat(), formatsCarousels: emptyFormat(),
           frequentiePostsAantal: '', frequentieStoriesAantal: '',
           insightsAccess: '', gemiddeldBereik: '', aantalVolgers: '',
-          gemiddeldeLikes: '', gemiddeldeComments: '', gemiddeldeShares: '', gemiddeldeEngagementRate: '',
+          gemiddeldeLikes: '', gemiddeldeComments: '', gemiddeldeShares: '',
         },
         strategischeContent: { positioneringsconsistentie: '', toneOfVoice: '', storytelling: '', emotie: '', doelgroepresonantie: '', formatstrategie: '' },
         communityAnalyse: { interactieComments: '', terugkerendeFans: '', userGeneratedContent: '', dmInteracties: '', communityBetrokkenheid: '', publiefOfCommunity: '' },
@@ -99,7 +99,6 @@
         gemiddeldeLikes: ca.gemiddeldeLikes || ca.performanceLikes || '',
         gemiddeldeComments: ca.gemiddeldeComments || ca.performanceComments || '',
         gemiddeldeShares: ca.gemiddeldeShares || ca.performanceShares || '',
-        gemiddeldeEngagementRate: ca.gemiddeldeEngagementRate || ca.performanceEngagementRate || '',
       };
 
       // Migrate concurrentieanalyse: flat object → array
@@ -183,7 +182,7 @@
       return               { color: '#10b981', text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Sterk' };
     }
 
-    // ─── Engagement rate berekening (auto of manueel) ─────────────────────────
+    // ─── Engagement rate berekening (uitsluitend automatisch) ────────────────
     function getEngagementRate(ca) {
       if (!ca) return '';
       const toNum = v => parseFloat(String(v || '').replace(/[^\d.,]/g,'').replace(',','.')) || 0;
@@ -199,7 +198,7 @@
         if (volgers > 0 && (likes + comments) > 0)
           return (((likes + comments) / volgers) * 100).toFixed(2) + '%';
       }
-      return ca.gemiddeldeEngagementRate || '';
+      return '';
     }
 
     function getCompetitorEngagementRate(c) {
@@ -256,7 +255,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 <h2>B — Merkidentiteit</h2>${pdfField('Visuele identiteit',int.merkidentiteit.visuelIdentiteit)}${pdfField('Tone of voice',int.merkidentiteit.toneOfVoice)}${pdfField('Consistentie van branding',int.merkidentiteit.consistentieBranding)}${pdfField('Waarden en missie',int.merkidentiteit.waardenMissie)}${pdfField('Huidige positionering',int.merkidentiteit.huidigePositionering)}
 <h2>C — Kanaalstrategie</h2>${pdfField('Actieve platformen',int.kanaalstrategie.actievePlatformen)}${pdfField('Onderbouwing per platform',int.kanaalstrategie.onderbouwingPerPlatform)}${pdfField('Primair kanaal',int.kanaalstrategie.primairKanaal)}${pdfField('Ontbrekende kanalen',int.kanaalstrategie.ontbrekendeKanalen)}
 <h2>D — Doelgroep</h2>${pdfField('Wie volgt het merk nu?',int.doelgroep.wieVolgt)}${pdfField('Leeftijd / interesses',int.doelgroep.leeftijdInteresses)}${pdfField('Gedrag',int.doelgroep.gedrag)}${pdfField('Engagement',int.doelgroep.engagement)}${pdfField('Community interactie',int.doelgroep.communityInteractie)}${pdfField('Gewenste doelgroep',int.doelgroep.gewensteDoelgroep)}${pdfField('Werkelijke doelgroep',int.doelgroep.werkelijkeDoelgroep)}
-<h2>E — Contentanalyse</h2>${pdfField('Posts (4 weken)',ca.frequentiePostsAantal)}${pdfField('Stories (4 weken)',ca.frequentieStoriesAantal)}${pdfField('Gem. likes',ca.gemiddeldeLikes)}${pdfField('Gem. comments',ca.gemiddeldeComments)}${pdfField('Gem. shares',ca.gemiddeldeShares)}${pdfField('Engagement rate', (() => { const er = ca.insightsAccess === 'ja' ? (()=>{ const l=parseFloat((ca.gemiddeldeLikes||'').replace(',','.'));const c=parseFloat((ca.gemiddeldeComments||'').replace(',','.'));const s2=parseFloat((ca.gemiddeldeShares||'').replace(',','.'));const b=parseFloat((ca.gemiddeldBereik||'').replace(',','.')); return b>0&&(l+c+s2)>0?((l+c+s2)/b*100).toFixed(2)+'%':''; })() : ca.insightsAccess === 'nee' ? (()=>{ const l=parseFloat((ca.gemiddeldeLikes||'').replace(',','.'));const c=parseFloat((ca.gemiddeldeComments||'').replace(',','.'));const v=parseFloat((ca.aantalVolgers||'').replace(',','.')); return v>0&&(l+c)>0?((l+c)/v*100).toFixed(2)+'%':''; })() : ca.gemiddeldeEngagementRate; return er || ''; })())}${pdfField('Formats — Foto',ca.formatsFoto?.uitleg)}${pdfField('Formats — Video',ca.formatsVideo?.uitleg)}${pdfField('Formats — Reels',ca.formatsReels?.uitleg)}${pdfField('Formats — Carousels',ca.formatsCarousels?.uitleg)}
+<h2>E — Contentanalyse</h2>${pdfField('Posts (4 weken)',ca.frequentiePostsAantal)}${pdfField('Stories (4 weken)',ca.frequentieStoriesAantal)}${pdfField('Gem. likes',ca.gemiddeldeLikes)}${pdfField('Gem. comments',ca.gemiddeldeComments)}${pdfField('Gem. shares',ca.gemiddeldeShares)}${pdfField('Engagement rate', (() => { const l=parseFloat(String(ca.gemiddeldeLikes||'').replace(',','.'));const c=parseFloat(String(ca.gemiddeldeComments||'').replace(',','.'));const s2=parseFloat(String(ca.gemiddeldeShares||'').replace(',','.')); if(ca.insightsAccess==='ja'){const b=parseFloat(String(ca.gemiddeldBereik||'').replace(',','.')); return b>0&&(l+c+s2)>0?((l+c+s2)/b*100).toFixed(2)+'%':'';}if(ca.insightsAccess==='nee'){const v=parseFloat(String(ca.aantalVolgers||'').replace(',','.')); return v>0&&(l+c)>0?((l+c)/v*100).toFixed(2)+'%':'';}return ''; })())}${pdfField('Formats — Foto',ca.formatsFoto?.uitleg)}${pdfField('Formats — Video',ca.formatsVideo?.uitleg)}${pdfField('Formats — Reels',ca.formatsReels?.uitleg)}${pdfField('Formats — Carousels',ca.formatsCarousels?.uitleg)}
 <h2>G — Strategische contentanalyse</h2>${pdfField('Positioneringsconsistentie',int.strategischeContent.positioneringsconsistentie)}${pdfField('Tone of voice',int.strategischeContent.toneOfVoice)}${pdfField('Storytelling',int.strategischeContent.storytelling)}${pdfField('Emotie',int.strategischeContent.emotie)}${pdfField('Doelgroepresonantie',int.strategischeContent.doelgroepresonantie)}${pdfField('Formatstrategie',int.strategischeContent.formatstrategie)}
 <h2>H — Community analyse</h2>${pdfField('Interactie in comments',int.communityAnalyse.interactieComments)}${pdfField('Terugkerende fans',int.communityAnalyse.terugkerendeFans)}${pdfField('User generated content',int.communityAnalyse.userGeneratedContent)}${pdfField('DM interacties',int.communityAnalyse.dmInteracties)}${pdfField('Community betrokkenheid',int.communityAnalyse.communityBetrokkenheid)}${pdfField('Publiek of echte community?',int.communityAnalyse.publiefOfCommunity)}
 <h2>I — Middelen</h2>${pdfField('Budget',int.middelen.budget)}${pdfField('Tijd',int.middelen.tijd)}${pdfField('Team',int.middelen.team)}${pdfField('Netwerk',int.middelen.netwerk)}${pdfField('Skills',int.middelen.skills)}
@@ -545,8 +544,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const erStr = getEngagementRate(data);
       const erNum = parseEngagementRate(erStr);
       const erc = erStr ? engagementRateColor(erNum) : engagementRateColor(null);
-      const erMissing = (data.insightsAccess === 'ja' && !String(data.gemiddeldBereik || '').trim()) ||
-                        (data.insightsAccess === 'nee' && !String(data.aantalVolgers || '').trim());
+      const erMissing = !erStr;
       const erNote = data.insightsAccess === 'ja'
         ? 'Berekend via Instagram Insights (bereik).'
         : data.insightsAccess === 'nee'
@@ -1398,9 +1396,8 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       // Engagement rate
       const erStr = getEngagementRate(ca);
       const erNum = parseEngagementRate(erStr);
-      const erMissing = (ca.insightsAccess === 'ja' && !String(ca.gemiddeldBereik || '').trim()) ||
-                        (ca.insightsAccess === 'nee' && !String(ca.aantalVolgers || '').trim());
-      const erC = erStr && !erMissing ? engagementRateColor(erNum) : engagementRateColor(null);
+      const erMissing = !erStr;
+      const erC = erStr ? engagementRateColor(erNum) : engagementRateColor(null);
       const erNote = ca.insightsAccess === 'ja'
         ? 'Berekend via Instagram Insights (bereik).'
         : ca.insightsAccess === 'nee'
@@ -2056,18 +2053,9 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                   rows={1}
                 />
               )}
-              {!data.contentanalyse.insightsAccess && (
-                <Field
-                  label="Gemiddelde engagement rate (manueel)"
-                  hint="Voer in als je al een berekening hebt, bijv. 3.2%"
-                  value={data.contentanalyse.gemiddeldeEngagementRate}
-                  onChange={v => s('contentanalyse','gemiddeldeEngagementRate',v)}
-                  rows={1}
-                />
-              )}
-              {data.contentanalyse.insightsAccess && (() => {
+              {(() => {
                 const er = getEngagementRate(data.contentanalyse);
-                if (!er) return <p className="text-xs text-gray-400 italic mt-2">Vul bovenstaande velden in om de engagement rate te berekenen.</p>;
+                if (!er) return <p className="text-xs text-gray-400 italic mt-2">Vul het vereiste veld in om de engagement rate te berekenen.</p>;
                 const erNum = parseEngagementRate(er);
                 const erc = engagementRateColor(erNum);
                 return (
