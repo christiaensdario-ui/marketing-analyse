@@ -243,8 +243,18 @@
     function buildPersonaPrompt(analysis) {
       const d  = analysis.interneAnalyse?.doelgroep || {};
       const dg = analysis.externeAnalyse?.doelgroepgedrag || {};
-      return `Genereer twee realistische buyer personas voor muziekmerk '${analysis.klantnaam || 'onbekend'}' op basis van deze data:
+      const ks = analysis.interneAnalyse?.kanaalstrategie || {};
+      const mk = analysis.interneAnalyse?.merkidentiteit || {};
+      const concurrenten = (Array.isArray(analysis.externeAnalyse?.concurrentieanalyse)
+        ? analysis.externeAnalyse.concurrentieanalyse : []).map(c => c.naam).filter(Boolean).join(', ') || '—';
+      const kloof = !!(d.gewensteDoelgroep && d.werkelijkeDoelgroep &&
+        d.gewensteDoelgroep.trim().toLowerCase() !== d.werkelijkeDoelgroep.trim().toLowerCase());
 
+      const personaSchema = `{"naam":"","leeftijd":0,"bio":"","motivaties":"","frustraties":"","mediagebruik":"","koopgedrag":"","quote":"","journey":[{"fase":"Ontdekking","beschrijving":"","voorbeeld":""},{"fase":"Overweging","beschrijving":"","voorbeeld":""},{"fase":"Beslissing","beschrijving":"","voorbeeld":""},{"fase":"Aankoop","beschrijving":"","voorbeeld":""},{"fase":"Terugkeer","beschrijving":"","voorbeeld":""}],"kanaaladvies":[{"platform":"","reden":"","content":"","timing":"","prioriteit":"primair"},{"platform":"","reden":"","content":"","timing":"","prioriteit":"secundair"},{"platform":"","reden":"","content":"","timing":"","prioriteit":"optioneel"}],"doelgroepvergelijking":{"overeenkomsten":"","verschillen":"","conclusie":""}}`;
+
+      return `Genereer ${kloof ? 'vier' : 'drie'} buyer personas voor muziekmerk '${analysis.klantnaam || 'onbekend'}'. Elke persona moet een volledig andere achtergrond, motivatie en gedragsprofiel hebben — geen twee persona's mogen op elkaar lijken.
+
+Analysedata:
 Gewenste doelgroep: ${d.gewensteDoelgroep || '—'}
 Werkelijke doelgroep: ${d.werkelijkeDoelgroep || '—'}
 Leeftijd / interesses: ${d.leeftijdInteresses || '—'}
@@ -254,9 +264,25 @@ Community interactie: ${d.communityInteractie || '—'}
 Platformgebruik: ${dg.platformgebruik || '—'}
 Beïnvloeders: ${dg.invloeden || '—'}
 Motivaties (marktdata): ${dg.motivatie || '—'}
+Actieve platformen merk: ${ks.actievePlatformen || '—'}
+Merkwaarden / missie: ${mk.waardenMissie || '—'}
+Positionering: ${mk.huidigePositionering || '—'}
+Concurrenten: ${concurrenten}
 
-Schrijf in het Nederlands. Geef de output UITSLUITEND als geldig JSON, geen extra tekst:
-{"persona1":{"naam":"","leeftijd":0,"bio":"","motivaties":"","frustraties":"","mediagebruik":"","koopgedrag":"","quote":""},"persona2":{"naam":"","leeftijd":0,"bio":"","motivaties":"","frustraties":"","mediagebruik":"","koopgedrag":"","quote":""}}`;
+Schrijf in het Nederlands. Geef de output UITSLUITEND als geldig JSON, geen extra tekst.
+
+Persona-definities:
+- Persona 1 — Kernklant: de persoon die het merk nu al bereikt en bedient. Gebaseerd op de WERKELIJKE doelgroep.
+- Persona 2 — Aspirationele klant: de persoon die het merk wil bereiken maar nog niet heeft. Gebaseerd op de GEWENSTE doelgroep.
+- Persona 3 — Randgeval: een verrassend segment dat NIET expliciet voorkomt in de doelgroepdata maar logisch voortvloeit uit de combinatie van merkidentiteit, culturele trends en concurrentiedata. Dit is de persona die de gebruiker niet had verwacht.${kloof ? `
+- Persona 4 — Conflictpersona: vertegenwoordigt de spanning tussen gewenste doelgroep (${d.gewensteDoelgroep}) en werkelijke doelgroep (${d.werkelijkeDoelgroep}). Dit is iemand die het merk bereikt maar niet wil bereiken, of omgekeerd. Beschrijf de achterliggende spanning in bio en motivaties. Geef in doelgroepvergelijking aan wat dit voor de strategie betekent.` : ''}
+
+Voor elke persona:
+- journey: 5 fases (Ontdekking→Overweging→Beslissing→Aankoop→Terugkeer). Beschrijving = wat de persona doet/denkt. Voorbeeld = concreet scenario.
+- kanaaladvies: 3 platformen met prioriteit (primair/secundair/optioneel). Reden, content, timing per platform.
+- doelgroepvergelijking: vergelijk met de WERKELIJKE doelgroep. Overeenkomsten, verschillen, conclusie.
+
+{"persona1":${personaSchema},"persona2":${personaSchema},"persona3":${personaSchema}${kloof ? `,"persona4":${personaSchema}` : ''}}`;
     }
 
     function buildSwotPrompt(analysis) {
@@ -776,6 +802,51 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                   <span className={`text-xs font-semibold ${warn ? 'text-amber-700' : 'text-gray-800'}`}>{arc.count}</span>
                   <span className={`text-xs w-9 text-right ${warn ? 'text-amber-600 font-bold' : 'text-gray-400'}`}>{Math.round(arc.frac * 100)}%</span>
                   {warn && <span className="text-xs text-amber-500" title="Te weinig variatie">⚠</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Mini donut chart (samenvatting, smaller variant) ─────────────────────
+    function MiniDonutChart({ data }) {
+      const keys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
+      const counts = keys.map(k => Math.max(0, Number(data[k]) || 0));
+      const total = counts.reduce((a, b) => a + b, 0);
+      if (total === 0) return null;
+      const R = 36, cx = 50, cy = 50, C = 2 * Math.PI * R;
+      let cumFrac = 0;
+      const arcs = counts.map((count, i) => {
+        const frac = count / total;
+        const dashLen = frac * C;
+        const offset = C * 0.25 - cumFrac * C;
+        cumFrac += frac;
+        return { frac, dashLen, gap: C - dashLen, offset, color: CONTENTMIX_COLORS[i], label: CONTENTMIX_LABELS[i], count };
+      });
+      return (
+        <div className="flex items-center gap-4">
+          <div className="shrink-0">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle cx={cx} cy={cy} r={R} fill="none" stroke="#f3f4f6" strokeWidth="16" />
+              {arcs.map((arc, i) => arc.count > 0 && (
+                <circle key={i} cx={cx} cy={cy} r={R} fill="none"
+                  stroke={arc.color} strokeWidth="16"
+                  strokeDasharray={`${arc.dashLen} ${arc.gap}`}
+                  strokeDashoffset={arc.offset} strokeLinecap="butt"
+                />
+              ))}
+            </svg>
+          </div>
+          <div className="flex-1 space-y-1.5">
+            {arcs.filter(a => a.count > 0).map((arc, i) => {
+              const warn = arc.frac > 0.6;
+              return (
+                <div key={i} className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: warn ? '#f59e0b' : arc.color }} />
+                  <span className={`text-xs flex-1 truncate ${warn ? 'text-amber-700 font-medium' : 'text-gray-600'}`}>{arc.label}</span>
+                  <span className={`text-xs font-semibold ${warn ? 'text-amber-600' : 'text-gray-500'}`}>{Math.round(arc.frac * 100)}%</span>
                 </div>
               );
             })}
@@ -1615,11 +1686,10 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
 
 // ─── Samenvatting page ────────────────────────────────────────────────────
-    function PageSamenvatting({ analysis, allInsights = [] }) {
+    function PageSamenvatting({ analysis, allInsights = [], personas, onNavigateToPersona }) {
       const { interneAnalyse: int, externeAnalyse: ext } = analysis;
       const ca = int.contentanalyse;
       const comm = int.communityAnalyse;
-      const swot = int.swot;
 
       // Community score
       const communityPct = computeCommunityScore(comm);
@@ -1637,7 +1707,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           ? 'Indicatieve score — publieke data (volgers).'
           : null;
 
-      // Contentmix dominant
+      // Contentmix
       const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
       const mixLabels = ['Promo','Behind the scenes','Community','Storytelling','Events','Memes / cultuur'];
       const counts = mixKeys.map(k => Number(ca[k]) || 0);
@@ -1655,13 +1725,32 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const bothFilled = gewenst && werkelijk;
       const mismatch = bothFilled && gewenst.toLowerCase() !== werkelijk.toLowerCase();
 
-      // SWOT top 2
-      const top2Lines = (text) => {
-        if (!text || !String(text).trim()) return [];
-        return String(text).split('\n').map(l => l.replace(/^[\s\-•*\d.]+/, '').trim()).filter(Boolean).slice(0, 2);
+      // ── Gezondheidscore ──────────────────────────────────────────────────────
+      const maxMixPct = total > 0 ? Math.max(...counts.map(c => (c / total) * 100)) : 0;
+      const commFactor  = communityPct >= 70 ? 'pos' : communityPct >= 40 ? 'neu' : 'neg';
+      const erFactor    = erNum === null ? 'neu' : erNum >= 5 ? 'pos' : erNum >= 2 ? 'neu' : 'neg';
+      const mixFactor   = total === 0 ? 'neu' : maxMixPct <= 50 ? 'pos' : maxMixPct <= 60 ? 'neu' : 'neg';
+      const kloofFactor = mismatch ? 'neg' : 'pos';
+      const positieven  = [commFactor, erFactor, mixFactor, kloofFactor].filter(f => f === 'pos').length;
+      const scoreLetter = ['F','D','C','B','A'][positieven];
+      const scoreDescMap = {
+        'A': 'Uitstekend merk — alle indicatoren positief',
+        'B': 'Sterk merk met gerichte aandachtspunten',
+        'C': 'Gemiddeld — meerdere verbeterpunten vereisen aandacht',
+        'D': 'Aandacht vereist — fundamentele uitdagingen zichtbaar',
+        'F': 'Kritisch — heroriëntatie van strategie aanbevolen',
       };
-      const topStrengths = top2Lines(swot.strengths);
-      const topThreats = top2Lines(swot.threats);
+      const scoreC = ['A','B'].includes(scoreLetter)
+        ? { bg: 'bg-emerald-50', border: 'border-emerald-200', letter: 'text-emerald-600', sub: 'text-emerald-700' }
+        : scoreLetter === 'C'
+          ? { bg: 'bg-amber-50', border: 'border-amber-200', letter: 'text-amber-500', sub: 'text-amber-700' }
+          : { bg: 'bg-red-50', border: 'border-red-200', letter: 'text-red-500', sub: 'text-red-700' };
+      const scoreFactors = [
+        { label: 'Community', factor: commFactor },
+        { label: 'Engagement', factor: erFactor },
+        { label: 'Contentmix', factor: mixFactor },
+        { label: 'Doelgroepkloof', factor: kloofFactor },
+      ];
 
       // Gaps
       const reelsPct = (() => {
@@ -1672,18 +1761,50 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         return totalFormats > 0 ? (reelsCount / totalFormats) * 100 : 0;
       })();
       const ontbKanalen = (int.kanaalstrategie?.ontbrekendeKanalen || '').trim();
-      const ontbSamenw = (ext.samenwerkingen?.ontbrekendeSamenwerkingen || '').trim();
-
+      const ontbSamenw  = (ext.samenwerkingen?.ontbrekendeSamenwerkingen || '').trim();
       const gaps = [];
       if (communityPct < 50) gaps.push({ text: 'Community-opbouw vereist aandacht', type: 'warn' });
       if (mismatch) gaps.push({ text: 'Kloof tussen gewenst en werkelijk publiek gedetecteerd', type: 'warn' });
       if (reelsPct < 20 && erNum !== null && erNum < 5) gaps.push({ text: 'Reels onderbenut terwijl engagement laag is — overweeg meer videoformats', type: 'warn' });
       if (ontbKanalen) gaps.push({ text: ontbKanalen, type: 'gap', label: 'Ontbrekende kanalen' });
-      if (ontbSamenw) gaps.push({ text: ontbSamenw, type: 'gap', label: 'Ontbrekende samenwerkingen' });
+      if (ontbSamenw)  gaps.push({ text: ontbSamenw,  type: 'gap', label: 'Ontbrekende samenwerkingen' });
+
+      // Persona snellinks
+      const PERSONA_TYPES = [
+        { key: 'persona1', label: 'Kernklant',          colors: 'bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100' },
+        { key: 'persona2', label: 'Aspirationele klant', colors: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' },
+        { key: 'persona3', label: 'Randgeval',           colors: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' },
+        { key: 'persona4', label: 'Conflictpersona',     colors: 'bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100' },
+      ];
+      const hasPersonas = personas && (personas.persona1 || personas.persona2 || personas.persona3);
 
       return (
         <div className="fade-in space-y-4">
-          {/* Key metrics */}
+
+          {/* ── Gezondheidscore ── */}
+          <div className={`${scoreC.bg} border ${scoreC.border} rounded-2xl p-5`}>
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Overall gezondheidscore</p>
+              <Tooltip text="Score op 4 factoren: community score (≥70% positief), engagement rate (≥5% positief), contentmix variatie (geen categorie ≥60% positief) en doelgroepkloof (geen kloof positief). Vier positieven = A · drie = B · twee = C · één = D · nul = F." />
+            </div>
+            <div className="flex items-center gap-5">
+              <p className={`text-7xl font-black leading-none ${scoreC.letter}`}>{scoreLetter}</p>
+              <div>
+                <p className={`text-sm font-semibold ${scoreC.sub} leading-snug`}>{scoreDescMap[scoreLetter]}</p>
+                <div className="flex gap-1.5 mt-2.5 flex-wrap">
+                  {scoreFactors.map(({ label, factor }) => (
+                    <span key={label} className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
+                      factor === 'pos' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                      factor === 'neu' ? 'bg-gray-50 border-gray-200 text-gray-500' :
+                                        'bg-red-50 border-red-200 text-red-600'
+                    }`}>{label} {factor === 'pos' ? '✓' : factor === 'neg' ? '✗' : '–'}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Key metrics ── */}
           <div className="grid grid-cols-2 gap-3">
             <div className={`${commC.bg} border ${commC.border} rounded-xl p-4`}>
               <div className="flex items-center gap-1 mb-2">
@@ -1707,77 +1828,45 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             </div>
           </div>
 
-          {/* Contentmix */}
+          {/* ── Contentmix ── */}
           {total > 0 && (
             <DCard title="Contentmix">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-400 mb-1">Dominante categorie</p>
-                  <p className="text-sm font-semibold text-gray-900">{dominantLabel}</p>
-                </div>
-                <div className="text-right">
-                  <p className={`text-2xl font-bold ${dominantPct > 60 ? 'text-amber-500' : 'text-gray-800'}`}>{dominantPct}%</p>
-                  {dominantPct > 60 && <p className="text-xs text-amber-500 font-medium">⚠ Te weinig variatie</p>}
-                </div>
-              </div>
+              <MiniDonutChart data={ca} />
+              {dominantLabel && (
+                <p className="text-xs text-gray-400 mt-3 text-center">
+                  Dominant: <span className={`font-semibold ${dominantPct > 60 ? 'text-amber-500' : 'text-gray-700'}`}>{dominantLabel} ({dominantPct}%)</span>
+                  {dominantPct > 60 && <span className="text-amber-500 ml-1.5">⚠ Te weinig variatie</span>}
+                </p>
+              )}
             </DCard>
           )}
 
-          {/* Doelgroep vergelijking */}
+          {/* ── Doelgroep ── */}
           {bothFilled && (
             <DCard title="Doelgroep">
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="rounded-lg p-3 bg-blue-50 border border-blue-100">
+              <div className="flex gap-2 mb-2">
+                <div className="flex-1 rounded-lg px-3 py-2 bg-blue-50 border border-blue-100">
                   <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">Gewenst</p>
-                  <p className="text-xs text-gray-700 leading-relaxed">{gewenst}</p>
+                  <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{gewenst}</p>
                 </div>
-                <div className="rounded-lg p-3 bg-amber-50 border border-amber-100">
+                <div className="flex-1 rounded-lg px-3 py-2 bg-amber-50 border border-amber-100">
                   <p className="text-xs font-bold text-amber-500 uppercase tracking-wide mb-1">Werkelijk</p>
-                  <p className="text-xs text-gray-700 leading-relaxed">{werkelijk}</p>
+                  <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{werkelijk}</p>
                 </div>
               </div>
               {mismatch && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 flex items-center gap-2">
-                  <span className="text-orange-400 text-sm">⚠</span>
-                  <p className="text-xs text-orange-600 font-medium">Doelgroep wijkt af van gewenst publiek</p>
+                <div className="bg-orange-50 border border-orange-300 rounded-xl px-4 py-3 mt-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-orange-500 text-base shrink-0">⚠</span>
+                    <p className="text-sm font-semibold text-orange-700">Doelgroep wijkt af van gewenst publiek</p>
+                  </div>
+                  <p className="text-xs text-orange-600 mt-1.5 ml-6 leading-relaxed">Er is een kloof gedetecteerd tussen wie je wil bereiken en wie je nu bereikt. Dit beïnvloedt je contentstrategie en communicatie.</p>
                 </div>
               )}
             </DCard>
           )}
 
-          {/* SWOT highlights */}
-          {(topStrengths.length > 0 || topThreats.length > 0) && (
-            <div className="grid grid-cols-2 gap-3">
-              {topStrengths.length > 0 && (
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
-                  <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide mb-3">Top sterktes</p>
-                  <ul className="space-y-2">
-                    {topStrengths.map((s, i) => (
-                      <li key={i} className="text-xs text-gray-700 flex gap-2">
-                        <span className="text-emerald-400 shrink-0 font-bold">✓</span>
-                        <span className="leading-relaxed">{s}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {topThreats.length > 0 && (
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-                  <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-3">Top bedreigingen</p>
-                  <ul className="space-y-2">
-                    {topThreats.map((t, i) => (
-                      <li key={i} className="text-xs text-gray-700 flex gap-2">
-                        <span className="text-amber-400 shrink-0 font-bold">!</span>
-                        <span className="leading-relaxed">{t}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Gaps sectie */}
+          {/* ── Gaps ── */}
           {gaps.length > 0 ? (
             <DCard title="Gedetecteerde gaps">
               <div className="space-y-3">
@@ -1799,30 +1888,179 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               <p className="text-sm italic">Geen gaps gedetecteerd op basis van de huidige data.</p>
             </div>
           )}
+
           <InzichtenBlok insights={allInsights} />
+
+          {/* ── Persona snellinks ── */}
+          <DCard title="Persona's">
+            {hasPersonas ? (
+              <div className="grid grid-cols-2 gap-2">
+                {PERSONA_TYPES.filter(pt => personas[pt.key]).map(pt => (
+                  <button
+                    key={pt.key}
+                    onClick={() => onNavigateToPersona && onNavigateToPersona(pt.key)}
+                    className={`border rounded-xl p-3 text-left transition-colors ${pt.colors}`}
+                  >
+                    <p className="text-xs font-bold truncate">{personas[pt.key].naam || '—'}</p>
+                    <p className="text-xs opacity-70 mt-0.5">{pt.label}</p>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 italic">Persona's worden automatisch gegenereerd wanneer de doelgroepsectie ingevuld is.</p>
+            )}
+          </DCard>
+
         </div>
       );
     }
 
 // ─── Dashboard Screen ─────────────────────────────────────────────────────
     // ─── Persona components ───────────────────────────────────────────────────
+    const PERSONA_TABS = ['Profiel', 'Customer Journey', 'Kanaaladvies', 'Doelgroepvergelijking'];
+    const JOURNEY_COLORS = ['violet', 'blue', 'emerald', 'amber', 'rose'];
+
+    function PersonaTabEmpty() {
+      return (
+        <div className="py-8 text-center">
+          <p className="text-xs text-gray-400">Regenereer de persona om deze tab te vullen</p>
+        </div>
+      );
+    }
+
     function PersonaCard({ persona, label, onRefresh, isLoading }) {
+      const [activeTab, setActiveTab] = useState('Profiel');
       if (!persona) return null;
       const initials = (persona.naam || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-      const rows = [
-        { icon: '💡', label: 'Motivaties',  value: persona.motivaties  },
-        { icon: '⚡', label: 'Frustraties', value: persona.frustraties },
-        { icon: '📱', label: 'Mediagebruik', value: persona.mediagebruik },
-        { icon: '🛒', label: 'Koopgedrag',  value: persona.koopgedrag  },
-      ];
+
+      function TabProfiel() {
+        const rows = [
+          { icon: '💡', label: 'Motivaties',   value: persona.motivaties   },
+          { icon: '⚡', label: 'Frustraties',  value: persona.frustraties  },
+          { icon: '📱', label: 'Mediagebruik', value: persona.mediagebruik },
+          { icon: '🛒', label: 'Koopgedrag',   value: persona.koopgedrag   },
+        ];
+        return (
+          <div>
+            {persona.quote && (
+              <p className="text-sm text-gray-500 italic leading-relaxed mb-4 border-l-2 border-violet-200 pl-3">"{persona.quote}"</p>
+            )}
+            {persona.bio && (
+              <p className="text-xs text-gray-600 leading-relaxed mb-4">{persona.bio}</p>
+            )}
+            <div className="space-y-3">
+              {rows.map(({ icon, label, value }) => (
+                <div key={label}>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">{icon} {label}</p>
+                  <p className="text-xs text-gray-700 leading-relaxed">{value || '—'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      function TabJourney() {
+        if (!persona.journey || !persona.journey.length) return <PersonaTabEmpty />;
+        return (
+          <div className="space-y-3">
+            {persona.journey.map((fase, i) => {
+              const color = JOURNEY_COLORS[i] || 'gray';
+              const bgMap = { violet: 'bg-violet-50 border-violet-200', blue: 'bg-blue-50 border-blue-200', emerald: 'bg-emerald-50 border-emerald-200', amber: 'bg-amber-50 border-amber-200', rose: 'bg-rose-50 border-rose-200', gray: 'bg-gray-50 border-gray-200' };
+              const badgeMap = { violet: 'bg-violet-100 text-violet-700', blue: 'bg-blue-100 text-blue-700', emerald: 'bg-emerald-100 text-emerald-700', amber: 'bg-amber-100 text-amber-700', rose: 'bg-rose-100 text-rose-700', gray: 'bg-gray-100 text-gray-700' };
+              return (
+                <div key={i} className={`border rounded-xl p-3 ${bgMap[color]}`}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badgeMap[color]}`}>{i + 1}</span>
+                    <p className="text-xs font-bold text-gray-800">{fase.fase}</p>
+                  </div>
+                  {fase.beschrijving && <p className="text-xs text-gray-700 leading-relaxed mb-1">{fase.beschrijving}</p>}
+                  {fase.voorbeeld && <p className="text-xs text-gray-500 italic leading-relaxed">Voorbeeld: {fase.voorbeeld}</p>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      function TabKanaaladvies() {
+        if (!persona.kanaaladvies || !persona.kanaaladvies.length) return <PersonaTabEmpty />;
+        const priMap = {
+          primair:   { badge: 'bg-emerald-100 text-emerald-700', label: 'Primair' },
+          secundair: { badge: 'bg-amber-100 text-amber-700',     label: 'Secundair' },
+          optioneel: { badge: 'bg-gray-100 text-gray-600',       label: 'Optioneel' },
+        };
+        return (
+          <div className="space-y-3">
+            {persona.kanaaladvies.map((k, i) => {
+              const pri = priMap[k.prioriteit] || priMap.optioneel;
+              return (
+                <div key={i} className="bg-white border border-gray-200 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-gray-800">{k.platform || '—'}</p>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${pri.badge}`}>{pri.label}</span>
+                  </div>
+                  {k.reden && (
+                    <div className="mb-1.5">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Waarom</p>
+                      <p className="text-xs text-gray-700 leading-relaxed">{k.reden}</p>
+                    </div>
+                  )}
+                  {k.content && (
+                    <div className="mb-1.5">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Content</p>
+                      <p className="text-xs text-gray-700 leading-relaxed">{k.content}</p>
+                    </div>
+                  )}
+                  {k.timing && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Timing</p>
+                      <p className="text-xs text-gray-700 leading-relaxed">{k.timing}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      function TabDoelgroepVergelijking() {
+        const dv = persona.doelgroepvergelijking;
+        if (!dv || (!dv.overeenkomsten && !dv.verschillen && !dv.conclusie)) return <PersonaTabEmpty />;
+        return (
+          <div className="space-y-3">
+            {dv.overeenkomsten && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <p className="text-xs font-bold text-emerald-700 mb-1">Overeenkomsten</p>
+                <p className="text-xs text-gray-700 leading-relaxed">{dv.overeenkomsten}</p>
+              </div>
+            )}
+            {dv.verschillen && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                <p className="text-xs font-bold text-red-700 mb-1">Verschillen</p>
+                <p className="text-xs text-gray-700 leading-relaxed">{dv.verschillen}</p>
+              </div>
+            )}
+            {dv.conclusie && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <p className="text-xs font-bold text-amber-700 mb-1">Conclusie voor strategie</p>
+                <p className="text-xs text-gray-700 leading-relaxed">{dv.conclusie}</p>
+              </div>
+            )}
+          </div>
+        );
+      }
+
       return (
-        <div className={`bg-white border border-gray-100 rounded-2xl p-5 shadow-sm relative ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className={`bg-white border border-gray-100 rounded-2xl shadow-sm relative ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70 z-10">
               <div className="w-6 h-6 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin" />
             </div>
           )}
-          <div className="flex items-start justify-between mb-4">
+          {/* Header */}
+          <div className="flex items-start justify-between p-5 pb-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center text-sm font-bold text-violet-700 shrink-0">
                 {initials}
@@ -1838,19 +2076,22 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-colors shrink-0 ml-2"
             >↻</button>
           </div>
-          {persona.quote && (
-            <p className="text-sm text-gray-500 italic leading-relaxed mb-4 px-1 border-l-2 border-violet-200 pl-3">"{persona.quote}"</p>
-          )}
-          {persona.bio && (
-            <p className="text-xs text-gray-600 leading-relaxed mb-4">{persona.bio}</p>
-          )}
-          <div className="space-y-3">
-            {rows.map(({ icon, label, value }) => (
-              <div key={label}>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">{icon} {label}</p>
-                <p className="text-xs text-gray-700 leading-relaxed">{value || '—'}</p>
-              </div>
+          {/* Tab bar */}
+          <div className="flex border-b border-gray-100 px-5 gap-3 overflow-x-auto">
+            {PERSONA_TABS.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`text-xs font-semibold pb-2.5 border-b-2 whitespace-nowrap transition-colors ${activeTab === tab ? 'border-violet-500 text-violet-700' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+              >{tab}</button>
             ))}
+          </div>
+          {/* Tab content */}
+          <div className="p-5">
+            {activeTab === 'Profiel'                && <TabProfiel />}
+            {activeTab === 'Customer Journey'       && <TabJourney />}
+            {activeTab === 'Kanaaladvies'           && <TabKanaaladvies />}
+            {activeTab === 'Doelgroepvergelijking'  && <TabDoelgroepVergelijking />}
           </div>
         </div>
       );
@@ -1865,6 +2106,8 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
       const d = analysis.interneAnalyse?.doelgroep || {};
       const hasData = d.gewensteDoelgroep || d.werkelijkeDoelgroep || d.gedrag;
+      const hasKloof = !!(d.gewensteDoelgroep && d.werkelijkeDoelgroep &&
+        d.gewensteDoelgroep.trim().toLowerCase() !== d.werkelijkeDoelgroep.trim().toLowerCase());
 
       useEffect(() => {
         if (apiKey && !personas && !loading && hasData) generateAll();
@@ -1875,7 +2118,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         if (!key) return;
         setLoading(true); setError(null);
         try {
-          const text = await callAnthropicAPI(key, [{ role: 'user', content: buildPersonaPrompt(analysis) }]);
+          const text = await callAnthropicAPI(key, [{ role: 'user', content: buildPersonaPrompt(analysis) }], 6000);
           onUpdate({ ...analysis, personas: parseJson(text) });
         } catch (e) { setError(e.message || 'Onbekende fout'); }
         finally { setLoading(false); }
@@ -1886,7 +2129,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         if (!key) return;
         setLoadingOne(personaKey); setError(null);
         try {
-          const text = await callAnthropicAPI(key, [{ role: 'user', content: buildPersonaPrompt(analysis) }]);
+          const text = await callAnthropicAPI(key, [{ role: 'user', content: buildPersonaPrompt(analysis) }], 6000);
           const result = parseJson(text);
           onUpdate({ ...analysis, personas: { ...(personas || {}), [personaKey]: result[personaKey] } });
         } catch (e) { setError(e.message || 'Onbekende fout'); }
@@ -1973,15 +2216,39 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
           {personas && (
             <div className="space-y-4">
-              {['persona1','persona2'].map((key, idx) => (
-                <PersonaCard
-                  key={key}
-                  persona={personas[key]}
-                  label={`Persona ${idx + 1}`}
-                  isLoading={loadingOne === key}
-                  onRefresh={() => refreshOne(key)}
-                />
+              {[
+                { key: 'persona1', label: 'Kernklant' },
+                { key: 'persona2', label: 'Aspirationele klant' },
+                { key: 'persona3', label: 'Randgeval' },
+              ].map(({ key, label }) => (
+                <div key={key} id={`persona-card-${key}`}>
+                  <PersonaCard
+                    persona={personas[key]}
+                    label={label}
+                    isLoading={loadingOne === key}
+                    onRefresh={() => refreshOne(key)}
+                  />
+                </div>
               ))}
+              {hasKloof && personas.persona4 && (
+                <>
+                  <div className="flex items-center gap-3 pt-2">
+                    <div className="h-px flex-1 bg-orange-200" />
+                    <span className="text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-3 py-1.5 whitespace-nowrap">
+                      Conflictpersona — gegenereerd op basis van gedetecteerde doelgroepkloof
+                    </span>
+                    <div className="h-px flex-1 bg-orange-200" />
+                  </div>
+                  <div id="persona-card-persona4">
+                    <PersonaCard
+                      persona={personas.persona4}
+                      label="Conflictpersona"
+                      isLoading={loadingOne === 'persona4'}
+                      onRefresh={() => refreshOne('persona4')}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -2208,7 +2475,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
           {/* Content */}
           <div className="max-w-2xl mx-auto px-4 py-6">
-            {mainTab === 'samenvatting' ? <PageSamenvatting analysis={analysis} allInsights={insights} /> :
+            {mainTab === 'samenvatting' ? <PageSamenvatting analysis={analysis} allInsights={insights} personas={analysis.personas} onNavigateToPersona={(key) => { setMainTab('personas'); setTimeout(() => { const el = document.getElementById('persona-card-' + key); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 200); }} /> :
              mainTab === 'interne'      ? renderInternePage() :
              mainTab === 'externe'      ? renderExternePage() :
              mainTab === 'personas'     ? <PagePersonas analysis={analysis} personas={analysis.personas} onUpdate={onUpdate} apiKey={apiKey} onSetApiKey={onSetApiKey} /> :
