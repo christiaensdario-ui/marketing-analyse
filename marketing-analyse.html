@@ -8,6 +8,7 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
   <style>
     textarea { resize: vertical; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -23,7 +24,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useRef, useEffect } = React;
+    const { useState, useRef, useEffect, useMemo, useId } = React;
 
     // ─── Data structure ───────────────────────────────────────────────────────
     const emptyFormat = () => ({ percentage: '', uitleg: '', voorbeelden: '' });
@@ -384,17 +385,26 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
     // ─── Form UI primitives ───────────────────────────────────────────────────
     function Field({ label, hint, value, onChange, rows = 3 }) {
+      const id = useId();
       return (
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+          <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
           {hint && <p className="text-xs text-gray-400 mb-1 italic">{hint}</p>}
           <textarea
+            id={id}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
             rows={rows} value={value} onChange={e => onChange(e.target.value)}
           />
         </div>
       );
     }
+    Field.propTypes = {
+      label: PropTypes.string.isRequired,
+      hint: PropTypes.string,
+      value: PropTypes.string,
+      onChange: PropTypes.func.isRequired,
+      rows: PropTypes.number,
+    };
 
     function SubSection({ letter, title, subtitle, children }) {
       return (
@@ -409,10 +419,17 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         </div>
       );
     }
+    SubSection.propTypes = {
+      letter: PropTypes.string,
+      title: PropTypes.string.isRequired,
+      subtitle: PropTypes.string,
+      children: PropTypes.node,
+    };
 
     function GroupLabel({ label }) {
       return <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-2 pb-1 border-b border-gray-100">{label}</p>;
     }
+    GroupLabel.propTypes = { label: PropTypes.string.isRequired };
 
     // ─── Dashboard UI primitives ──────────────────────────────────────────────
     function DataRow({ label, value }) {
@@ -441,6 +458,11 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         </div>
       );
     }
+    DCard.propTypes = {
+      title: PropTypes.string,
+      letter: PropTypes.string,
+      children: PropTypes.node,
+    };
 
     // SWOT 2×2 grid
     function SwotBlock({ swot }) {
@@ -643,7 +665,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const c = INSIGHT_COLORS[insight.type] || INSIGHT_COLORS.opportunity;
       return (
         <div className={`rounded-xl p-4 flex gap-3 items-start border ${c.bg} ${c.border}`}>
-          <span className="text-base shrink-0 mt-0.5">{insight.icon}</span>
+          <span className="text-base shrink-0 mt-0.5" aria-hidden="true">{insight.icon}</span>
           <div>
             <p className={`text-xs font-bold mb-1 ${c.title}`}>{insight.title}</p>
             <p className={`text-xs leading-relaxed ${c.text}`}>{insight.text}</p>
@@ -651,6 +673,29 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         </div>
       );
     }
+    InsightCard.propTypes = {
+      insight: PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        type: PropTypes.oneOf(['tension', 'opportunity', 'urgent']).isRequired,
+        icon: PropTypes.string.isRequired,
+        title: PropTypes.string.isRequired,
+        text: PropTypes.string.isRequired,
+        pages: PropTypes.arrayOf(PropTypes.string).isRequired,
+      }).isRequired,
+    };
+
+    // Herbruikbaar inline inzichten-blok voor subpagina's
+    function PageInsights({ insights }) {
+      if (!insights || !insights.length) return null;
+      return (
+        <div className="space-y-2">
+          {insights.map(i => <InsightCard key={i.id} insight={i} />)}
+        </div>
+      );
+    }
+    PageInsights.propTypes = {
+      insights: PropTypes.array,
+    };
 
     function InzichtenBlok({ insights, title = 'Automatische inzichten' }) {
       if (!insights || !insights.length) return null;
@@ -761,16 +806,21 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     // ─── Badge detection & icon cards ────────────────────────────────────────
+    const _cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+    const BADGE_RULES = [
+      { words: ['sterk', 'consistent', 'goed', 'hoog'],  bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+      { words: ['matig', 'gemengd', 'beperkt'],          bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200'   },
+      { words: ['zwak', 'inconsistent', 'laag', 'geen'], bg: 'bg-red-50',     text: 'text-red-600',     border: 'border-red-200'     },
+    ].map(r => ({ ...r, patterns: r.words.map(w => ({ re: new RegExp(`\\b${w}`), word: w })) }));
+
     function detectBadge(text) {
       if (!text || !String(text).trim()) return null;
       const t = String(text).toLowerCase();
-      const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-      const greenWords  = ['sterk', 'consistent', 'goed', 'hoog'];
-      const orangeWords = ['matig', 'gemengd', 'beperkt'];
-      const redWords    = ['zwak', 'inconsistent', 'laag', 'geen'];
-      for (const w of greenWords)  if (new RegExp(`\\b${w}`).test(t)) return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: cap(w) };
-      for (const w of orangeWords) if (new RegExp(`\\b${w}`).test(t)) return { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   label: cap(w) };
-      for (const w of redWords)    if (new RegExp(`\\b${w}`).test(t)) return { bg: 'bg-red-50',     text: 'text-red-600',     border: 'border-red-200',     label: cap(w) };
+      for (const rule of BADGE_RULES) {
+        for (const { re, word } of rule.patterns) {
+          if (re.test(t)) return { bg: rule.bg, text: rule.text, border: rule.border, label: _cap(word) };
+        }
+      }
       return null;
     }
 
@@ -781,16 +831,27 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         </span>
       );
     }
+    BadgePill.propTypes = {
+      bg: PropTypes.string.isRequired,
+      text: PropTypes.string.isRequired,
+      border: PropTypes.string.isRequired,
+      label: PropTypes.string.isRequired,
+    };
 
     function Tooltip({ text }) {
       const [show, setShow] = useState(false);
       return (
         <span className="relative inline-flex items-center ml-1 shrink-0">
           <span
+            role="button"
+            tabIndex={0}
+            aria-label={text}
             className="w-3.5 h-3.5 rounded-full bg-gray-200 text-gray-500 inline-flex items-center justify-center cursor-help hover:bg-gray-300 transition-colors select-none shrink-0"
             style={{ fontSize: '9px', fontWeight: 700, lineHeight: 1 }}
             onMouseEnter={() => setShow(true)}
             onMouseLeave={() => setShow(false)}
+            onFocus={() => setShow(true)}
+            onBlur={() => setShow(false)}
           >?</span>
           {show && (
             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 w-60 bg-gray-900 text-white text-xs rounded-xl px-3 py-2.5 shadow-xl leading-relaxed whitespace-normal pointer-events-none">
@@ -849,7 +910,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageMerkidentiteit({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-3">
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
+          <PageInsights insights={insights} />
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">B</span>
             <h4 className="text-sm font-semibold text-gray-800">Merkidentiteit</h4>
@@ -868,7 +929,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageKanaalstrategie({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-3">
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
+          <PageInsights insights={insights} />
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">C</span>
             <h4 className="text-sm font-semibold text-gray-800">Kanaalstrategie</h4>
@@ -886,7 +947,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageDoelgroep({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-4">
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
+          <PageInsights insights={insights} />
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">D</span>
             <h4 className="text-sm font-semibold text-gray-800">Doelgroep (huidige)</h4>
@@ -932,7 +993,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const formatColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b'];
       return (
         <div className="fade-in space-y-4">
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
+          <PageInsights insights={insights} />
           <DCard letter="E" title="Contentmix">
             <DonutChart data={data} />
           </DCard>
@@ -967,7 +1028,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       ];
       return (
         <div className="fade-in space-y-3">
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
+          <PageInsights insights={insights} />
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">G</span>
             <h4 className="text-sm font-semibold text-gray-800">Strategische contentanalyse</h4>
@@ -982,21 +1043,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     function CommunityMeter({ data }) {
-      // Score op basis van 4 velden: elk gevuld = +1, langere tekst = hoger
-      const scoreField = (v) => {
-        if (!v || !String(v).trim()) return 0;
-        const len = String(v).trim().length;
-        if (len < 20) return 0.5;
-        if (len < 80) return 1;
-        return 1.5;
-      };
-      const rawScore =
-        scoreField(data.interactieComments) +
-        scoreField(data.terugkerendeFans) +
-        scoreField(data.userGeneratedContent) +
-        scoreField(data.communityBetrokkenheid);
-      // max = 6, normalize to 0-100
-      const pct = Math.min(100, Math.round((rawScore / 6) * 100));
+      const pct = computeCommunityScore(data);
       const label = pct < 25 ? 'Publiek' : pct < 50 ? 'Emerging community' : pct < 75 ? 'Actieve community' : 'Echte community';
       const color = pct < 40 ? '#ef4444' : pct <= 70 ? '#f59e0b' : '#10b981';
 
@@ -1032,7 +1079,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageCommunity({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-4">
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
+          <PageInsights insights={insights} />
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">H</span>
             <h4 className="text-sm font-semibold text-gray-800">Community analyse</h4>
@@ -1066,7 +1113,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageMiddelen({ data, insights = [] }) {
       return (
         <div className="fade-in space-y-3">
-          {insights.length > 0 && <div className="space-y-2">{insights.map(i => <InsightCard key={i.id} insight={i} />)}</div>}
+          <PageInsights insights={insights} />
           <DCard letter="I" title="Middelen (resources)">
             <MiddelenGrid data={data} />
           </DCard>
@@ -1417,6 +1464,12 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
 // ─── Dashboard Screen ─────────────────────────────────────────────────────
+    const MAIN_TABS = [
+      { id: 'samenvatting', label: 'Samenvatting' },
+      { id: 'interne',      label: 'Interne Analyse' },
+      { id: 'externe',      label: 'Externe Analyse' },
+    ];
+
     const INTERNE_TABS = [
       { id: 'organisatie',     label: 'Organisatie',    letter: 'A' },
       { id: 'merkidentiteit',  label: 'Merkidentiteit', letter: 'B' },
@@ -1449,6 +1502,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             <button
               key={t.id}
               data-active={active === t.id}
+              aria-current={active === t.id ? 'page' : undefined}
               onClick={() => onChange(t.id)}
               className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-shrink-0
                 ${active === t.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'}`}
@@ -1460,6 +1514,21 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         </div>
       );
     }
+    SubTabBar.propTypes = {
+      tabs: PropTypes.arrayOf(PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        label: PropTypes.string.isRequired,
+        letter: PropTypes.string,
+      })).isRequired,
+      active: PropTypes.string.isRequired,
+      onChange: PropTypes.func.isRequired,
+    };
+
+    DashboardScreen.propTypes = {
+      analysis: PropTypes.object.isRequired,
+      onBack: PropTypes.func.isRequired,
+      onEdit: PropTypes.func.isRequired,
+    };
 
     function DashboardScreen({ analysis, onBack, onEdit }) {
       const [mainTab, setMainTab] = useState('samenvatting');
@@ -1468,7 +1537,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const [showExportMenu, setShowExportMenu] = useState(false);
       const exportMenuRef = useRef();
       const { interneAnalyse: int, externeAnalyse: ext } = analysis;
-      const insights = detectInsights(analysis);
+      const insights = useMemo(() => detectInsights(analysis), [analysis]);
 
       useEffect(() => {
         if (!showExportMenu) return;
@@ -1517,6 +1586,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               <div className="flex items-center justify-between gap-3">
                 <button
                   onClick={onBack}
+                  aria-label="Terug naar overzicht"
                   className="text-sm text-gray-400 hover:text-gray-700 transition-colors flex items-center gap-1 shrink-0"
                 >
                   ←
@@ -1571,14 +1641,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               </div>
 
               {/* Main tabs */}
-              <div className="flex gap-1 mt-3">
-                {[
-                  { id: 'samenvatting', label: 'Samenvatting' },
-                  { id: 'interne',      label: 'Interne Analyse' },
-                  { id: 'externe',      label: 'Externe Analyse' },
-                ].map(t => (
+              <div className="flex gap-1 mt-3" role="tablist" aria-label="Analysenavigatie">
+                {MAIN_TABS.map(t => (
                   <button
                     key={t.id}
+                    role="tab"
+                    aria-selected={mainTab === t.id}
+                    aria-current={mainTab === t.id ? 'page' : undefined}
                     onClick={() => handleMainTab(t.id)}
                     className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors
                       ${mainTab === t.id ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-700'}`}
@@ -1681,6 +1750,11 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     // ─── Step 1: Interne Analyse form ─────────────────────────────────────────
+    InterneAnalyseForm.propTypes = {
+      data: PropTypes.object.isRequired,
+      onChange: PropTypes.func.isRequired,
+    };
+
     function InterneAnalyseForm({ data, onChange }) {
       const s = (section, key, val) => onChange({ ...data, [section]: { ...data[section], [key]: val } });
       return (
@@ -1811,6 +1885,11 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     // ─── Step 2: Externe Analyse form ─────────────────────────────────────────
+    ExterneAnalyseForm.propTypes = {
+      data: PropTypes.object.isRequired,
+      onChange: PropTypes.func.isRequired,
+    };
+
     function ExterneAnalyseForm({ data, onChange }) {
       const s = (section, key, val) => onChange({ ...data, [section]: { ...data[section], [key]: val } });
 
@@ -1895,6 +1974,12 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     // ─── Form Screen ──────────────────────────────────────────────────────────
+    FormScreen.propTypes = {
+      initial: PropTypes.object,
+      onSave: PropTypes.func.isRequired,
+      onBack: PropTypes.func.isRequired,
+    };
+
     function FormScreen({ initial, onSave, onBack }) {
       const TOTAL = 3;
       const [step, setStep] = useState(1);
@@ -1990,6 +2075,15 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     // ─── Opening Screen ───────────────────────────────────────────────────────
+    OpeningScreen.propTypes = {
+      analyses: PropTypes.arrayOf(PropTypes.object).isRequired,
+      onNew: PropTypes.func.isRequired,
+      onImport: PropTypes.func.isRequired,
+      onOpen: PropTypes.func.isRequired,
+      onDelete: PropTypes.func.isRequired,
+      onExport: PropTypes.func.isRequired,
+    };
+
     function OpeningScreen({ analyses, onNew, onImport, onOpen, onDelete, onExport }) {
       const fileRef = useRef();
       const handleFileChange = (e) => {
@@ -2000,6 +2094,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           try { onImport(JSON.parse(ev.target.result)); }
           catch { alert('Ongeldig JSON-bestand. Controleer het bestand en probeer opnieuw.'); }
         };
+        reader.onerror = () => alert('Kon het bestand niet lezen. Probeer opnieuw.');
         reader.readAsText(file);
         e.target.value = '';
       };
@@ -2039,22 +2134,35 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             ) : (
               <div className="space-y-2">
                 {analyses.map(a => (
-                  <div key={a.id} onClick={() => onOpen(a)}
-                    className="group bg-white border border-gray-100 rounded-xl px-5 py-4 flex items-center justify-between cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all">
+                  <div
+                    key={a.id}
+                    onClick={() => onOpen(a)}
+                    onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onOpen(a)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open analyse: ${a.klantnaam || 'Naamloos'}`}
+                    className="group bg-white border border-gray-100 rounded-xl px-5 py-4 flex items-center justify-between cursor-pointer hover:border-gray-300 hover:shadow-sm transition-all"
+                  >
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{a.klantnaam || 'Naamloos'}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{formatDate(a.datum)}</p>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={e => { e.stopPropagation(); onExport(a); }}
-                        className="text-xs text-gray-400 hover:text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors">
+                      <button
+                        onClick={e => { e.stopPropagation(); onExport(a); }}
+                        aria-label={`Exporteer analyse: ${a.klantnaam || 'Naamloos'}`}
+                        className="text-xs text-gray-400 hover:text-gray-700 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
+                      >
                         Export
                       </button>
-                      <button onClick={e => { e.stopPropagation(); onDelete(a.id); }}
-                        className="text-xs text-gray-400 hover:text-red-500 px-2.5 py-1.5 rounded-md hover:bg-red-50 transition-colors">
+                      <button
+                        onClick={e => { e.stopPropagation(); onDelete(a.id); }}
+                        aria-label={`Verwijder analyse: ${a.klantnaam || 'Naamloos'}`}
+                        className="text-xs text-gray-400 hover:text-red-500 px-2.5 py-1.5 rounded-md hover:bg-red-50 transition-colors"
+                      >
                         Verwijder
                       </button>
-                      <span className="text-gray-300 ml-1">→</span>
+                      <span className="text-gray-300 ml-1" aria-hidden="true">→</span>
                     </div>
                   </div>
                 ))}
@@ -2076,7 +2184,11 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       });
 
       const persist = (list) => {
-        localStorage.setItem('ma_analyses', JSON.stringify(list));
+        try {
+          localStorage.setItem('ma_analyses', JSON.stringify(list));
+        } catch (e) {
+          console.warn('Analyses konden niet worden opgeslagen (localStorage):', e);
+        }
         setAnalyses(list);
       };
 
