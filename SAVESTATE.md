@@ -2,7 +2,7 @@
 
 ## Laatste opslag
 **Datum:** 2026-03-20
-**Commit hash:** `c6c1390` *(zie ook: e23b27d, 71420a7, dd6ca65, bcc81fb)*
+**Commit hash:** `3661b1c` *(zie ook: 38f8d22, f83c460)*
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
 
@@ -10,43 +10,33 @@
 
 ## Samenvatting recente wijzigingen
 
-### Commit bcc81fb — UX verbeteringen ronde 2
-1. **getEngagementRate() helper** — Berekent ER via Instagram Insights (bereik) of indicatief (volgers)
-2. **insightsAccess keuze (ja/nee)** — Radiobuttons; conditionele velden; live ER-preview
-3. **ER-bronvermelding** — "Berekend via Instagram Insights" of "Indicatieve score" op dashboard
-4. **Formats instructietekst + <30 waarschuwing + dashboard disclaimer**
-5. **Frequentie gecombineerde dashboardlijn** — "Gemiddeld X posts/week en Y stories/week"
-6. **Inzicht 9: Dynamische trendnaam** — Noemt specifieke gedetecteerde trend
-7. **PDF export** — Inline ER-berekening op basis van insightsAccess
+### Commit 38f8d22 — SWOT vergelijking visueel verbeterd
+1. **Vergelijkingskaartjes** — Elk verschil in een eigen afgebakend kaartje met titel en bodytekst
+2. **Gekleurde streep** — Oranje = AI kritischer, blauw = AI ziet extra kans
+3. **parseVergelijking()** — Verwerkt zowel nieuw JSON-array als legacy string-formaat
 
-### Commit dd6ca65 — 4 bugfixes invoerflow
-8. **Frequentie info-kadertje** — Blauw kader met instructietekst + vraagteken-tooltip
-9. **GroupLabel tooltip-prop** — Frequentie-sectie krijgt uitleg posts vs stories
-10. **ER dashboard/samenvatting geblokkeerd** — Placeholder zolang bereik/volgers ontbreekt
-11. **Concurrent engagement** — Vrij tekstveld vervangen door likes+comments+volgers + auto ER
+### Commit 3661b1c — Persona generator uitbreiding + samenvattingspagina redesign
 
-### Commit 71420a7 — Manueel ER-veld volledig verwijderd
-12. **gemiddeldeEngagementRate** — Verwijderd uit emptyData, migratie, helper, formulier en PDF
-13. **getEngagementRate()** — Geeft alleen nog waarde bij volledig ingevulde auto-berekening
-14. **erMissing = !erStr** — Dekt alle gevallen: geen keuze, ontbrekend veld, geen data
+#### Persona tabs (4 tabs per kaart)
+4. **Profiel** — Bestaande inhoud (naam, bio, quote, motivaties, frustraties, mediagebruik, koopgedrag)
+5. **Customer Journey** — 5 fases (Ontdekking→Terugkeer), elk met beschrijving + voorbeeld, kleurcodering per fase
+6. **Kanaaladvies** — Platform-kaartjes met prioriteit-badge (primair/secundair/optioneel), reden/content/timing
+7. **Doelgroepvergelijking** — Overeenkomsten (groen), verschillen (rood), conclusie (amber)
 
-### Commit e23b27d — Concurrent frequentie + performance sectie
-15. **emptyCompetitor** — postsAantal, storiesAantal, engagementShares toegevoegd
-16. **Formulier** — Frequentie-kadertje + posts/stories + ≈/week + performance grid (4 velden)
-17. **Auto ER-preview** — Placeholder zolang likes, comments of volgers ontbreekt
-18. **Dashboard tabel** — Posts/week en Stories/week rijen toegevoegd
-19. **PDF export** — Posts/week en Stories/week kolommen in concurrent-tabel
+#### Persona generator uitbreiding (3+1 persona's)
+8. **Kernklant (persona1)** — Gebaseerd op werkelijke doelgroep
+9. **Aspirationele klant (persona2)** — Gebaseerd op gewenste doelgroep
+10. **Randgeval (persona3)** — Verrassend segment via merkidentiteit + trends + concurrentie
+11. **Conflictpersona (persona4)** — Automatisch bij doelgroepkloof (gewenst ≠ werkelijk); oranje banner
+12. **buildPersonaPrompt** — Expliciete rollen per persona, geen twee mogen gelijken; merkwaarden + concurrenten als extra context; maxTokens 6000
+13. **Persona-ID's** — `id="persona-card-{key}"` voor scrollnavigatie vanuit samenvatting
 
-### Commit c6c1390 — Persona Creator + AI SWOT via Anthropic API
-20. **callAnthropicAPI()** — Directe browser-fetch naar claude-sonnet-4-20250514
-21. **Persona's tab** — Nieuwe tab (laatste); auto-generatie bij eerste bezoek
-22. **PersonaCard** — Naam, leeftijd, bio, quote, motivaties, frustraties, mediagebruik, koopgedrag
-23. **Refresh per persona** — ↻ knop per kaart hergenereert alleen die persona
-24. **AI SWOT** — Parallelle SWOT naast handmatige; side-by-side met SwotBlockNarrow
-25. **Vergelijkingsnoot** — Max 3 punten met grootste verschillen tussen beide SWOT's
-26. **API sleutel** — Opgeslagen in localStorage (ma_apikey); setup-scherm bij eerste gebruik
-27. **Error handling** — Rode foutmelding + "Opnieuw" knop bij alle AI-functies
-28. **Persistentie** — personas en aiSwot opgeslagen in analyseobject; bewaard na herstart
+#### Samenvattingspagina redesign
+14. **Gezondheidscore A–F** — Bovenaan, 4 factoren: community/ER/contentmix/doelgroepkloof; groen/oranje/rood; factor-badges ✓/✗; tooltip
+15. **MiniDonutChart** — Volledige donut (100×100px) vervangt dominante-categorie-tekst; alle categorieën + percentages
+16. **Doelgroep compact** — Kleinere blokken met line-clamp; mismatch-waarschuwing groter, prominenter, met uitlegtekst
+17. **SWOT highlights verwijderd** — Top sterktes/bedreigingen weg van samenvattingspagina
+18. **Persona snellinks** — Klikbare kaartjes onderaan; navigeert naar personas-tab + scrollt naar betreffende kaart
 
 ---
 
@@ -58,7 +48,7 @@
 ### Features actief
 - Multi-client analyse beheer (aanmaken, opslaan, openen, verwijderen)
 - PDF export (print-dialoog) + JSON export/import
-- Samenvattingspagina als standaard eerste tab
+- Samenvattingspagina: gezondheidscore A–F, mini-donut contentmix, doelgroep compact, persona snellinks
 - Interne analyse: Organisatie (SVG OrgChart), Merkidentiteit, Kanalen, Doelgroep, Content, Strategie, Community, Middelen, SWOT
 - Externe analyse: Concurrentie (multi + frequentie/performance per concurrent), Samenwerkingen, Markt/Scene, Doelgroepgedrag, Trends
 - Dashboard: badges + tooltips, IconDataCards, tag-chips, SVG organogram, performance metrics
@@ -66,8 +56,10 @@
 - Automatische inzichten: 9 data-verbindingen, 3 kleurtypen, teller bovenaan
 - Engagement rate: uitsluitend automatisch berekend (Insights/bereik of publiek/volgers)
 - Concurrent ER: automatisch via publieke formule (likes + comments) / volgers
-- Persona Creator: 2 AI-persona's via Anthropic API, per persona refresh-knop
-- AI SWOT: parallelle analyse naast handmatige SWOT met vergelijkingsnoot
+- Persona Creator: 3 standaard persona's + optionele conflictpersona via Anthropic API
+  - 4 tabs per kaart: Profiel, Customer Journey, Kanaaladvies, Doelgroepvergelijking
+  - Refresh per persona; persistentie in analyseobject
+- AI SWOT: parallelle analyse naast handmatige SWOT met vergelijkingsnoot (gestructureerde kaartjes)
 - LocalStorage persistentie met automatische migratie
 
 ### Tech stack
