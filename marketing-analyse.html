@@ -41,6 +41,7 @@
           contentmixPromo: 0, contentmixBehindScenes: 0, contentmixCommunity: 0, contentmixStorytelling: 0, contentmixEvents: 0, contentmixMemes: 0,
           formatsFoto: emptyFormat(), formatsVideo: emptyFormat(), formatsReels: emptyFormat(), formatsCarousels: emptyFormat(),
           frequentiePostsAantal: '', frequentieStoriesAantal: '',
+          insightsAccess: '', gemiddeldBereik: '', aantalVolgers: '',
           gemiddeldeLikes: '', gemiddeldeComments: '', gemiddeldeShares: '', gemiddeldeEngagementRate: '',
         },
         strategischeContent: { positioneringsconsistentie: '', toneOfVoice: '', storytelling: '', emotie: '', doelgroepresonantie: '', formatstrategie: '' },
@@ -91,6 +92,9 @@
         // Migrate frequency fields (old free-text 'frequentie' is ignored; new numeric fields preserved)
         frequentiePostsAantal: ca.frequentiePostsAantal !== undefined ? ca.frequentiePostsAantal : '',
         frequentieStoriesAantal: ca.frequentieStoriesAantal !== undefined ? ca.frequentieStoriesAantal : '',
+        insightsAccess: ca.insightsAccess || '',
+        gemiddeldBereik: ca.gemiddeldBereik || '',
+        aantalVolgers: ca.aantalVolgers || '',
         // Migrate renamed performance fields
         gemiddeldeLikes: ca.gemiddeldeLikes || ca.performanceLikes || '',
         gemiddeldeComments: ca.gemiddeldeComments || ca.performanceComments || '',
@@ -179,6 +183,25 @@
       return               { color: '#10b981', text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Sterk' };
     }
 
+    // ─── Engagement rate berekening (auto of manueel) ─────────────────────────
+    function getEngagementRate(ca) {
+      if (!ca) return '';
+      const toNum = v => parseFloat(String(v || '').replace(/[^\d.,]/g,'').replace(',','.')) || 0;
+      const likes    = toNum(ca.gemiddeldeLikes);
+      const comments = toNum(ca.gemiddeldeComments);
+      const shares   = toNum(ca.gemiddeldeShares);
+      if (ca.insightsAccess === 'ja') {
+        const bereik = toNum(ca.gemiddeldBereik);
+        if (bereik > 0 && (likes + comments + shares) > 0)
+          return (((likes + comments + shares) / bereik) * 100).toFixed(2) + '%';
+      } else if (ca.insightsAccess === 'nee') {
+        const volgers = toNum(ca.aantalVolgers);
+        if (volgers > 0 && (likes + comments) > 0)
+          return (((likes + comments) / volgers) * 100).toFixed(2) + '%';
+      }
+      return ca.gemiddeldeEngagementRate || '';
+    }
+
     function exportAnalysis(analysis) {
       const json = JSON.stringify(analysis, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
@@ -222,7 +245,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 <h2>B — Merkidentiteit</h2>${pdfField('Visuele identiteit',int.merkidentiteit.visuelIdentiteit)}${pdfField('Tone of voice',int.merkidentiteit.toneOfVoice)}${pdfField('Consistentie van branding',int.merkidentiteit.consistentieBranding)}${pdfField('Waarden en missie',int.merkidentiteit.waardenMissie)}${pdfField('Huidige positionering',int.merkidentiteit.huidigePositionering)}
 <h2>C — Kanaalstrategie</h2>${pdfField('Actieve platformen',int.kanaalstrategie.actievePlatformen)}${pdfField('Onderbouwing per platform',int.kanaalstrategie.onderbouwingPerPlatform)}${pdfField('Primair kanaal',int.kanaalstrategie.primairKanaal)}${pdfField('Ontbrekende kanalen',int.kanaalstrategie.ontbrekendeKanalen)}
 <h2>D — Doelgroep</h2>${pdfField('Wie volgt het merk nu?',int.doelgroep.wieVolgt)}${pdfField('Leeftijd / interesses',int.doelgroep.leeftijdInteresses)}${pdfField('Gedrag',int.doelgroep.gedrag)}${pdfField('Engagement',int.doelgroep.engagement)}${pdfField('Community interactie',int.doelgroep.communityInteractie)}${pdfField('Gewenste doelgroep',int.doelgroep.gewensteDoelgroep)}${pdfField('Werkelijke doelgroep',int.doelgroep.werkelijkeDoelgroep)}
-<h2>E — Contentanalyse</h2>${pdfField('Posts (4 weken)',ca.frequentiePostsAantal)}${pdfField('Stories (4 weken)',ca.frequentieStoriesAantal)}${pdfField('Gem. likes',ca.gemiddeldeLikes)}${pdfField('Gem. comments',ca.gemiddeldeComments)}${pdfField('Gem. shares',ca.gemiddeldeShares)}${pdfField('Engagement rate',ca.gemiddeldeEngagementRate)}${pdfField('Formats — Foto',ca.formatsFoto?.uitleg)}${pdfField('Formats — Video',ca.formatsVideo?.uitleg)}${pdfField('Formats — Reels',ca.formatsReels?.uitleg)}${pdfField('Formats — Carousels',ca.formatsCarousels?.uitleg)}
+<h2>E — Contentanalyse</h2>${pdfField('Posts (4 weken)',ca.frequentiePostsAantal)}${pdfField('Stories (4 weken)',ca.frequentieStoriesAantal)}${pdfField('Gem. likes',ca.gemiddeldeLikes)}${pdfField('Gem. comments',ca.gemiddeldeComments)}${pdfField('Gem. shares',ca.gemiddeldeShares)}${pdfField('Engagement rate', (() => { const er = ca.insightsAccess === 'ja' ? (()=>{ const l=parseFloat((ca.gemiddeldeLikes||'').replace(',','.'));const c=parseFloat((ca.gemiddeldeComments||'').replace(',','.'));const s2=parseFloat((ca.gemiddeldeShares||'').replace(',','.'));const b=parseFloat((ca.gemiddeldBereik||'').replace(',','.')); return b>0&&(l+c+s2)>0?((l+c+s2)/b*100).toFixed(2)+'%':''; })() : ca.insightsAccess === 'nee' ? (()=>{ const l=parseFloat((ca.gemiddeldeLikes||'').replace(',','.'));const c=parseFloat((ca.gemiddeldeComments||'').replace(',','.'));const v=parseFloat((ca.aantalVolgers||'').replace(',','.')); return v>0&&(l+c)>0?((l+c)/v*100).toFixed(2)+'%':''; })() : ca.gemiddeldeEngagementRate; return er || ''; })())}${pdfField('Formats — Foto',ca.formatsFoto?.uitleg)}${pdfField('Formats — Video',ca.formatsVideo?.uitleg)}${pdfField('Formats — Reels',ca.formatsReels?.uitleg)}${pdfField('Formats — Carousels',ca.formatsCarousels?.uitleg)}
 <h2>G — Strategische contentanalyse</h2>${pdfField('Positioneringsconsistentie',int.strategischeContent.positioneringsconsistentie)}${pdfField('Tone of voice',int.strategischeContent.toneOfVoice)}${pdfField('Storytelling',int.strategischeContent.storytelling)}${pdfField('Emotie',int.strategischeContent.emotie)}${pdfField('Doelgroepresonantie',int.strategischeContent.doelgroepresonantie)}${pdfField('Formatstrategie',int.strategischeContent.formatstrategie)}
 <h2>H — Community analyse</h2>${pdfField('Interactie in comments',int.communityAnalyse.interactieComments)}${pdfField('Terugkerende fans',int.communityAnalyse.terugkerendeFans)}${pdfField('User generated content',int.communityAnalyse.userGeneratedContent)}${pdfField('DM interacties',int.communityAnalyse.dmInteracties)}${pdfField('Community betrokkenheid',int.communityAnalyse.communityBetrokkenheid)}${pdfField('Publiek of echte community?',int.communityAnalyse.publiefOfCommunity)}
 <h2>I — Middelen</h2>${pdfField('Budget',int.middelen.budget)}${pdfField('Tijd',int.middelen.tijd)}${pdfField('Team',int.middelen.team)}${pdfField('Netwerk',int.middelen.netwerk)}${pdfField('Skills',int.middelen.skills)}
@@ -254,7 +277,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         if (!m) return false;
         return parseFloat(m[1].replace(/\./g, '').replace(',', '.')) < 500;
       })();
-      const erNum = parseEngagementRate(int.contentanalyse?.gemiddeldeEngagementRate || '');
+      const erNum = parseEngagementRate(getEngagementRate(int.contentanalyse || {}));
       const commScore = computeCommunityScore(int.communityAnalyse || {});
       const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
       const cnts = mixKeys.map(k => Number(int.contentanalyse?.[k]) || 0);
@@ -503,9 +526,14 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
     // Performance metric cards — big numbers, no misleading bars
     function PerformancePanel({ data }) {
-      const erStr = data.gemiddeldeEngagementRate;
+      const erStr = getEngagementRate(data);
       const erNum = parseEngagementRate(erStr);
       const erc = engagementRateColor(erNum);
+      const erNote = data.insightsAccess === 'ja'
+        ? 'Berekend via Instagram Insights (bereik).'
+        : data.insightsAccess === 'nee'
+          ? 'Indicatieve score — berekend op basis van publieke data (volgers).'
+          : null;
       const metrics = [
         { label: 'Likes',    value: data.gemiddeldeLikes },
         { label: 'Comments', value: data.gemiddeldeComments },
@@ -528,6 +556,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                 <Tooltip text="Onder 2% = laag, 2–5% = gemiddeld, boven 5% = goed — gebaseerd op industrie benchmark voor sociale media." />
               </div>
               <p className={`text-2xl font-bold ${erc.text}`}>{erStr || '—'}</p>
+              {erNote && <p className="text-xs text-gray-400 mt-1 italic">{erNote}</p>}
             </div>
             {erc.label && (
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>
@@ -1015,12 +1044,20 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         { label: 'Carousels', value: data.formatsCarousels, color: formatColors[3] },
       ];
       const totalFormats = formats.reduce((sum, f) => sum + (Math.max(0, Number(f.value?.count) || 0)), 0);
+      const formatOnderdrempel = totalFormats > 0 && totalFormats < 30;
 
       const postsAantal = Number(data.frequentiePostsAantal) || 0;
       const storiesAantal = Number(data.frequentieStoriesAantal) || 0;
       const fmt = n => Number.isInteger(n) ? String(n) : n.toFixed(1).replace('.0','');
       const postsPerWeek = postsAantal > 0 ? fmt(postsAantal / 4) : null;
       const storiesPerWeek = storiesAantal > 0 ? fmt(storiesAantal / 4) : null;
+
+      const freqText = (() => {
+        if (postsPerWeek && storiesPerWeek) return `Gemiddeld ${postsPerWeek} posts per week en ${storiesPerWeek} stories per week`;
+        if (postsPerWeek) return `Gemiddeld ${postsPerWeek} posts per week`;
+        if (storiesPerWeek) return `Gemiddeld ${storiesPerWeek} stories per week`;
+        return null;
+      })();
 
       return (
         <div className="fade-in space-y-4">
@@ -1032,14 +1069,17 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             {formats.map((f, i) => (
               <FormatBarCard key={i} label={f.label} value={f.value} color={f.color} totalFormats={totalFormats} />
             ))}
+            {formatOnderdrempel && (
+              <p className="text-xs text-amber-600 italic mt-3">
+                ⚠ Berekening gebaseerd op {totalFormats} posts — minder dan 30.
+              </p>
+            )}
           </DCard>
           <DCard title="Frequentie">
-            {postsPerWeek || storiesPerWeek ? (
-              <div className="space-y-1">
-                {postsPerWeek && <p className="text-sm text-gray-800">gemiddeld <strong>{postsPerWeek}</strong> posts per week</p>}
-                {storiesPerWeek && <p className="text-sm text-gray-800">gemiddeld <strong>{storiesPerWeek}</strong> stories per week</p>}
-                <p className="text-xs text-gray-400 mt-2 italic">Gebaseerd op de laatste 4 weken.</p>
-              </div>
+            {freqText ? (
+              <p className="text-sm text-gray-800 leading-relaxed">
+                {freqText} — <span className="text-gray-400 italic">gebaseerd op de laatste 4 weken.</span>
+              </p>
             ) : (
               <p className="text-sm text-gray-300 italic">—</p>
             )}
@@ -1331,9 +1371,14 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const commLabel = communityPct < 25 ? 'Publiek' : communityPct < 50 ? 'Emerging community' : communityPct < 75 ? 'Actieve community' : 'Echte community';
 
       // Engagement rate
-      const erStr = ca.gemiddeldeEngagementRate;
+      const erStr = getEngagementRate(ca);
       const erNum = parseEngagementRate(erStr);
       const erC = engagementRateColor(erNum);
+      const erNote = ca.insightsAccess === 'ja'
+        ? 'Berekend via Instagram Insights (bereik).'
+        : ca.insightsAccess === 'nee'
+          ? 'Indicatieve score — publieke data (volgers).'
+          : null;
 
       // Contentmix dominant
       const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
@@ -1398,6 +1443,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               </div>
               <p className={`text-3xl font-bold ${erC.text}`}>{erStr || '—'}</p>
               {erC.label && <p className={`text-xs font-semibold mt-1 ${erC.text}`}>{erC.label}</p>}
+              {erNote && <p className="text-xs text-gray-400 mt-1 italic">{erNote}</p>}
             </div>
           </div>
 
@@ -1882,19 +1928,31 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               );
             })()}
             <GroupLabel label="Formats" />
-            <p className="text-xs text-gray-400 mb-3 -mt-1 italic">Gebaseerd op je laatste 30 posts.</p>
+            <p className="text-xs text-gray-500 mb-3 -mt-1">Geef het aantal posts per format in van je laatste 30 posts.</p>
             {(() => {
               const ca = data.contentanalyse;
               const formatKeys = ['formatsFoto','formatsVideo','formatsReels','formatsCarousels'];
               const totalFormats = formatKeys.reduce((sum, k) => sum + (Math.max(0, Number(ca[k]?.count) || 0)), 0);
-              return [
-                { key: 'formatsFoto',      label: 'Foto'      },
-                { key: 'formatsVideo',     label: 'Video'     },
-                { key: 'formatsReels',     label: 'Reels'     },
-                { key: 'formatsCarousels', label: 'Carousels' },
-              ].map(({ key, label }) => (
-                <FormatField key={key} label={label} value={ca[key]} onChange={v => s('contentanalyse', key, v)} totalFormats={totalFormats} />
-              ));
+              const onderdrempel = totalFormats > 0 && totalFormats < 30;
+              return (
+                <>
+                  {[
+                    { key: 'formatsFoto',      label: 'Foto'      },
+                    { key: 'formatsVideo',     label: 'Video'     },
+                    { key: 'formatsReels',     label: 'Reels'     },
+                    { key: 'formatsCarousels', label: 'Carousels' },
+                  ].map(({ key, label }) => (
+                    <FormatField key={key} label={label} value={ca[key]} onChange={v => s('contentanalyse', key, v)} totalFormats={totalFormats} />
+                  ))}
+                  {onderdrempel && (
+                    <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-start gap-2">
+                      <span className="text-amber-400 shrink-0 mt-0.5">⚠</span>
+                      <p className="text-xs text-amber-700">Je hebt minder dan 30 posts ingegeven — de berekening is gebaseerd op je beschikbare data.</p>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400 mb-3 italic">De percentages worden automatisch berekend op basis van je ingegeven aantallen.</p>
+                </>
+              );
             })()}
             <GroupLabel label="Frequentie" />
             <p className="text-xs text-gray-400 mb-3 -mt-1 italic">Gebaseerd op de laatste 4 weken.</p>
@@ -1927,10 +1985,70 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               </div>
             </div>
             <GroupLabel label="Performance (gemiddelden)" />
-            <Field label="Gemiddelde likes" value={data.contentanalyse.gemiddeldeLikes} onChange={v => s('contentanalyse','gemiddeldeLikes',v)} rows={2} />
-            <Field label="Gemiddelde comments" value={data.contentanalyse.gemiddeldeComments} onChange={v => s('contentanalyse','gemiddeldeComments',v)} rows={2} />
-            <Field label="Gemiddelde shares" value={data.contentanalyse.gemiddeldeShares} onChange={v => s('contentanalyse','gemiddeldeShares',v)} rows={2} />
-            <Field label="Gemiddelde engagement rate" value={data.contentanalyse.gemiddeldeEngagementRate} onChange={v => s('contentanalyse','gemiddeldeEngagementRate',v)} rows={2} />
+            <Field label="Gemiddelde likes" value={data.contentanalyse.gemiddeldeLikes} onChange={v => s('contentanalyse','gemiddeldeLikes',v)} rows={1} />
+            <Field label="Gemiddelde comments" value={data.contentanalyse.gemiddeldeComments} onChange={v => s('contentanalyse','gemiddeldeComments',v)} rows={1} />
+            <Field label="Gemiddelde shares" value={data.contentanalyse.gemiddeldeShares} onChange={v => s('contentanalyse','gemiddeldeShares',v)} rows={1} />
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Heb je toegang tot Instagram Insights van dit account?</p>
+              <div className="flex gap-5 mb-3">
+                {[{ val: 'ja', label: 'Ja' }, { val: 'nee', label: 'Nee' }].map(({ val, label }) => (
+                  <label key={val} className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="radio"
+                      name="insightsAccess"
+                      value={val}
+                      checked={data.contentanalyse.insightsAccess === val}
+                      onChange={() => s('contentanalyse','insightsAccess',val)}
+                      className="accent-gray-800"
+                    />
+                    <span className="text-sm text-gray-700">{label}</span>
+                  </label>
+                ))}
+              </div>
+              {data.contentanalyse.insightsAccess === 'ja' && (
+                <Field
+                  label="Gemiddeld bereik van je laatste 10 posts"
+                  hint="Vind je dit in Instagram Insights → kies een post → bekijk Bereik. Doe dit voor 10 recente posts en bereken het gemiddelde."
+                  value={data.contentanalyse.gemiddeldBereik || ''}
+                  onChange={v => s('contentanalyse','gemiddeldBereik',v)}
+                  rows={1}
+                />
+              )}
+              {data.contentanalyse.insightsAccess === 'nee' && (
+                <Field
+                  label="Huidig aantal volgers"
+                  value={data.contentanalyse.aantalVolgers || ''}
+                  onChange={v => s('contentanalyse','aantalVolgers',v)}
+                  rows={1}
+                />
+              )}
+              {!data.contentanalyse.insightsAccess && (
+                <Field
+                  label="Gemiddelde engagement rate (manueel)"
+                  hint="Voer in als je al een berekening hebt, bijv. 3.2%"
+                  value={data.contentanalyse.gemiddeldeEngagementRate}
+                  onChange={v => s('contentanalyse','gemiddeldeEngagementRate',v)}
+                  rows={1}
+                />
+              )}
+              {data.contentanalyse.insightsAccess && (() => {
+                const er = getEngagementRate(data.contentanalyse);
+                if (!er) return <p className="text-xs text-gray-400 italic mt-2">Vul bovenstaande velden in om de engagement rate te berekenen.</p>;
+                const erNum = parseEngagementRate(er);
+                const erc = engagementRateColor(erNum);
+                return (
+                  <div className={`${erc.bg} border ${erc.border} rounded-xl px-4 py-3 flex items-center justify-between mt-2`}>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-0.5">Engagement rate (automatisch berekend)</p>
+                      <p className={`text-xl font-bold ${erc.text}`}>{er}</p>
+                    </div>
+                    {erc.label && (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>{erc.label}</span>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </SubSection>
           <SubSection letter="G" title="Strategische contentanalyse" subtitle="Niet alleen cijfers, maar ook inhoud.">
             <Field label="Positioneringsconsistentie" value={data.strategischeContent.positioneringsconsistentie} onChange={v => s('strategischeContent','positioneringsconsistentie',v)} rows={3} />
