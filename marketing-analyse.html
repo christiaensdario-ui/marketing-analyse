@@ -285,8 +285,37 @@ Weaknesses: ${sw.weaknesses || '—'}
 Opportunities: ${sw.opportunities || '—'}
 Threats: ${sw.threats || '—'}
 
-Schrijf in het Nederlands. Geef de output UITSLUITEND als geldig JSON, geen extra tekst:
-{"strengths":"","weaknesses":"","opportunities":"","threats":"","vergelijking":"max 3 punten gescheiden door \\n- "}`;
+Schrijf in het Nederlands. Geef de output UITSLUITEND als geldig JSON, geen extra tekst.
+Voor "vergelijking": geef maximaal 3 items als array. Elk item heeft:
+- "titel": 3-5 woorden die het verschil samenvatten (bijv. "Storytelling anders beoordeeld")
+- "tekst": 1-2 zinnen uitleg van het verschil
+- "type": "critical" als de AI kritischer is dan de gebruiker, "opportunity" als de AI een kans ziet die de gebruiker niet noemde
+
+{"strengths":"","weaknesses":"","opportunities":"","threats":"","vergelijking":[{"titel":"","tekst":"","type":"critical"}]}`;
+    }
+
+    // Parse vergelijking — handles both new array format and legacy string format
+    function parseVergelijking(v) {
+      if (!v) return [];
+      if (Array.isArray(v)) return v;
+      // Legacy: plain string, split on dash-prefixed lines
+      const items = String(v).split(/\n[-•–]\s*/).map(s => s.replace(/^[-•–]\s*/, '').trim()).filter(Boolean);
+      return items.map(raw => {
+        const colonIdx = raw.indexOf(':');
+        let titel, tekst;
+        if (colonIdx > 0 && colonIdx < 60) {
+          titel = raw.slice(0, colonIdx).trim();
+          tekst  = raw.slice(colonIdx + 1).trim();
+        } else {
+          const words = raw.split(/\s+/);
+          titel = words.slice(0, Math.min(5, words.length)).join(' ');
+          tekst  = words.length > 5 ? words.slice(5).join(' ') : raw;
+        }
+        const lower = raw.toLowerCase();
+        const type = ['kans','ziet','mogelijkheid','potentieel','overzie','benut'].some(w => lower.includes(w))
+          ? 'opportunity' : 'critical';
+        return { titel, tekst, type };
+      });
     }
 
     function exportAnalysis(analysis) {
@@ -1391,12 +1420,35 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                       <SwotBlockNarrow swot={aiSwot} />
                     </div>
                   </div>
-                  {aiSwot.vergelijking && (
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Grootste verschillen</p>
-                      <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{aiSwot.vergelijking}</p>
-                    </div>
-                  )}
+                  {aiSwot.vergelijking && (() => {
+                    const items = parseVergelijking(aiSwot.vergelijking);
+                    if (!items.length) return null;
+                    return (
+                      <div className="mt-6 pt-5 border-t border-gray-200">
+                        <div className="mb-3">
+                          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Grootste verschillen</p>
+                          <p className="text-xs text-gray-400 mt-0.5">Oranje = AI kritischer · Blauw = AI ziet extra kans</p>
+                        </div>
+                        <div className="space-y-2">
+                          {items.map((item, idx) => {
+                            const isOpp = item.type === 'opportunity';
+                            return (
+                              <div
+                                key={idx}
+                                className={`bg-gray-50 border border-gray-200 rounded-xl overflow-hidden flex`}
+                              >
+                                <div className={`w-1 shrink-0 ${isOpp ? 'bg-blue-400' : 'bg-orange-400'}`} />
+                                <div className="px-4 py-3">
+                                  <p className="text-xs font-bold text-gray-800 mb-1">{item.titel}</p>
+                                  <p className="text-xs text-gray-600 leading-relaxed">{item.tekst}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>
