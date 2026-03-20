@@ -111,7 +111,7 @@
         concurrentieanalyse = [emptyCompetitor()];
       }
 
-      return {
+      const result = {
         interneAnalyse: {
           ...base.interneAnalyse,
           ...int,
@@ -125,6 +125,9 @@
           samenwerkingen: { ...base.externeAnalyse.samenwerkingen, ...(ext.samenwerkingen || {}) },
         },
       };
+      if (raw.personas) result.personas = raw.personas;
+      if (raw.aiSwot)   result.aiSwot   = raw.aiSwot;
+      return result;
     }
 
     function deepMerge(target, source) {
@@ -210,6 +213,80 @@
       if (volgers > 0 && (likes + comments) > 0)
         return (((likes + comments) / volgers) * 100).toFixed(2) + '%';
       return '';
+    }
+
+    // ─── Anthropic API ────────────────────────────────────────────────────────
+    async function callAnthropicAPI(apiKey, messages, maxTokens = 2000) {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTokens, messages }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `API fout ${res.status}`);
+      }
+      return (await res.json()).content[0].text;
+    }
+
+    function parseJson(text) {
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error('Geen geldige JSON ontvangen van de API.');
+      return JSON.parse(m[0]);
+    }
+
+    function buildPersonaPrompt(analysis) {
+      const d  = analysis.interneAnalyse?.doelgroep || {};
+      const dg = analysis.externeAnalyse?.doelgroepgedrag || {};
+      return `Genereer twee realistische buyer personas voor muziekmerk '${analysis.klantnaam || 'onbekend'}' op basis van deze data:
+
+Gewenste doelgroep: ${d.gewensteDoelgroep || '—'}
+Werkelijke doelgroep: ${d.werkelijkeDoelgroep || '—'}
+Leeftijd / interesses: ${d.leeftijdInteresses || '—'}
+Gedrag: ${d.gedrag || '—'}
+Motivatie / engagement: ${d.engagement || '—'}
+Community interactie: ${d.communityInteractie || '—'}
+Platformgebruik: ${dg.platformgebruik || '—'}
+Beïnvloeders: ${dg.invloeden || '—'}
+Motivaties (marktdata): ${dg.motivatie || '—'}
+
+Schrijf in het Nederlands. Geef de output UITSLUITEND als geldig JSON, geen extra tekst:
+{"persona1":{"naam":"","leeftijd":0,"bio":"","motivaties":"","frustraties":"","mediagebruik":"","koopgedrag":"","quote":""},"persona2":{"naam":"","leeftijd":0,"bio":"","motivaties":"","frustraties":"","mediagebruik":"","koopgedrag":"","quote":""}}`;
+    }
+
+    function buildSwotPrompt(analysis) {
+      const int = analysis.interneAnalyse || {};
+      const ext = analysis.externeAnalyse || {};
+      const sw  = int.swot || {};
+      const mk  = int.merkidentiteit || {};
+      const er  = getEngagementRate(int.contentanalyse || {});
+      const concNamen = (Array.isArray(ext.concurrentieanalyse) ? ext.concurrentieanalyse : []).map(c => c.naam).filter(Boolean).join(', ') || '—';
+      return `Analyseer de volgende data voor muziekmerk '${analysis.klantnaam || 'onbekend'}' en stel een onafhankelijke SWOT op. Vergelijk daarna met de SWOT van de gebruiker en geef maximaal 3 punten met de grootste verschillen.
+
+Analysedata:
+- Merkwaarden/missie: ${mk.waardenMissie || '—'}
+- Positionering: ${mk.huidigePositionering || '—'}
+- Gewenste doelgroep: ${int.doelgroep?.gewensteDoelgroep || '—'}
+- Engagement rate: ${er || '—'}
+- Budget: ${int.middelen?.budget || '—'}
+- Actieve platformen: ${int.kanaalstrategie?.actievePlatformen || '—'}
+- Marktverzadiging: ${ext.marktSceneAnalyse?.marktverzadiging || '—'}
+- Concurrenten: ${concNamen}
+- Culturele trends: ${ext.cultureleTrends?.genrePopulariteit || '—'}
+
+SWOT van de gebruiker:
+Strengths: ${sw.strengths || '—'}
+Weaknesses: ${sw.weaknesses || '—'}
+Opportunities: ${sw.opportunities || '—'}
+Threats: ${sw.threats || '—'}
+
+Schrijf in het Nederlands. Geef de output UITSLUITEND als geldig JSON, geen extra tekst:
+{"strengths":"","weaknesses":"","opportunities":"","threats":"","vergelijking":"max 3 punten gescheiden door \\n- "}`;
     }
 
     function exportAnalysis(analysis) {
@@ -520,20 +597,36 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     };
 
     // SWOT 2×2 grid
+    const SWOT_QUADS = [
+      { key: 'strengths',    label: 'Strengths',    bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700' },
+      { key: 'weaknesses',   label: 'Weaknesses',   bg: 'bg-red-50',     border: 'border-red-100',     text: 'text-red-600'     },
+      { key: 'opportunities',label: 'Opportunities', bg: 'bg-blue-50',    border: 'border-blue-100',    text: 'text-blue-700'    },
+      { key: 'threats',      label: 'Threats',      bg: 'bg-amber-50',   border: 'border-amber-100',   text: 'text-amber-700'   },
+    ];
+
     function SwotBlock({ swot }) {
-      const quads = [
-        { key: 'strengths',    label: 'Strengths',    bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700' },
-        { key: 'weaknesses',   label: 'Weaknesses',   bg: 'bg-red-50',     border: 'border-red-100',     text: 'text-red-600'     },
-        { key: 'opportunities',label: 'Opportunities', bg: 'bg-blue-50',    border: 'border-blue-100',    text: 'text-blue-700'    },
-        { key: 'threats',      label: 'Threats',      bg: 'bg-amber-50',   border: 'border-amber-100',   text: 'text-amber-700'   },
-      ];
       return (
         <div className="grid grid-cols-2 gap-3">
-          {quads.map(q => (
+          {SWOT_QUADS.map(q => (
             <div key={q.key} className={`${q.bg} border ${q.border} rounded-xl p-4`}>
               <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${q.text}`}>{q.label}</p>
               <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                {swot[q.key] || <span className="text-gray-300 italic">—</span>}
+                {(swot || {})[q.key] || <span className="text-gray-300 italic">—</span>}
+              </p>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    function SwotBlockNarrow({ swot }) {
+      return (
+        <div className="space-y-2">
+          {SWOT_QUADS.map(q => (
+            <div key={q.key} className={`${q.bg} border ${q.border} rounded-xl p-3`}>
+              <p className={`text-xs font-bold uppercase tracking-wide mb-1 ${q.text}`}>{q.label}</p>
+              <p className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">
+                {(swot || {})[q.key] || <span className="text-gray-300 italic">—</span>}
               </p>
             </div>
           ))}
@@ -1216,7 +1309,26 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       );
     }
 
-    function PageSwot({ data }) {
+    function PageSwot({ data, analysis, apiKey, onUpdate }) {
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+      const aiSwot = analysis?.aiSwot;
+      const hasSwotData = data && Object.values(data).some(v => v && String(v).trim());
+
+      useEffect(() => {
+        if (apiKey && hasSwotData && !aiSwot && !loading) generateAiSwot();
+      }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+      async function generateAiSwot() {
+        if (!apiKey || !analysis) return;
+        setLoading(true); setError(null);
+        try {
+          const text = await callAnthropicAPI(apiKey, [{ role: 'user', content: buildSwotPrompt(analysis) }]);
+          onUpdate({ ...analysis, aiSwot: parseJson(text) });
+        } catch (e) { setError(e.message || 'Onbekende fout'); }
+        finally { setLoading(false); }
+      }
+
       return (
         <div className="fade-in">
           <div className="mb-4 flex items-baseline gap-2">
@@ -1224,6 +1336,71 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             <h4 className="text-sm font-semibold text-gray-800">SWOT analyse</h4>
           </div>
           <SwotBlock swot={data} />
+
+          {hasSwotData && (
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800">AI SWOT — Parallelle analyse</h4>
+                  <p className="text-xs text-gray-400 mt-0.5">Gegenereerd op basis van alle analysedata.</p>
+                </div>
+                {aiSwot && !loading && (
+                  <button
+                    onClick={generateAiSwot}
+                    className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-colors"
+                    title="AI SWOT opnieuw genereren"
+                  >↻ Opnieuw</button>
+                )}
+              </div>
+
+              {!apiKey && !aiSwot && (
+                <p className="text-xs text-gray-400 italic">Voeg een Anthropic API sleutel in via de Persona's tab om een AI SWOT te genereren.</p>
+              )}
+
+              {apiKey && !aiSwot && !loading && !error && (
+                <button
+                  onClick={generateAiSwot}
+                  className="inline-flex items-center gap-1.5 text-xs bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                >✦ Genereer AI SWOT</button>
+              )}
+
+              {loading && (
+                <div className="flex items-center gap-2 py-10 justify-center">
+                  <div className="w-5 h-5 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin" />
+                  <p className="text-xs text-gray-400">AI SWOT wordt gegenereerd...</p>
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-2">
+                  <span className="text-red-400 shrink-0">⚠</span>
+                  <p className="text-xs text-red-700 flex-1">{error}</p>
+                  <button onClick={generateAiSwot} className="text-xs text-red-600 font-semibold shrink-0">Opnieuw</button>
+                </div>
+              )}
+
+              {aiSwot && !loading && (
+                <>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Jouw analyse</p>
+                      <SwotBlockNarrow swot={data} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">AI analyse</p>
+                      <SwotBlockNarrow swot={aiSwot} />
+                    </div>
+                  </div>
+                  {aiSwot.vergelijking && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Grootste verschillen</p>
+                      <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{aiSwot.vergelijking}</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       );
     }
@@ -1576,10 +1753,204 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
 // ─── Dashboard Screen ─────────────────────────────────────────────────────
+    // ─── Persona components ───────────────────────────────────────────────────
+    function PersonaCard({ persona, label, onRefresh, isLoading }) {
+      if (!persona) return null;
+      const initials = (persona.naam || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      const rows = [
+        { icon: '💡', label: 'Motivaties',  value: persona.motivaties  },
+        { icon: '⚡', label: 'Frustraties', value: persona.frustraties },
+        { icon: '📱', label: 'Mediagebruik', value: persona.mediagebruik },
+        { icon: '🛒', label: 'Koopgedrag',  value: persona.koopgedrag  },
+      ];
+      return (
+        <div className={`bg-white border border-gray-100 rounded-2xl p-5 shadow-sm relative ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70 z-10">
+              <div className="w-6 h-6 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin" />
+            </div>
+          )}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center text-sm font-bold text-violet-700 shrink-0">
+                {initials}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">{persona.naam}</p>
+                <p className="text-xs text-gray-400">{persona.leeftijd} jaar · {label}</p>
+              </div>
+            </div>
+            <button
+              onClick={onRefresh}
+              title="Genereer opnieuw"
+              className="text-xs text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-colors shrink-0 ml-2"
+            >↻</button>
+          </div>
+          {persona.quote && (
+            <p className="text-sm text-gray-500 italic leading-relaxed mb-4 px-1 border-l-2 border-violet-200 pl-3">"{persona.quote}"</p>
+          )}
+          {persona.bio && (
+            <p className="text-xs text-gray-600 leading-relaxed mb-4">{persona.bio}</p>
+          )}
+          <div className="space-y-3">
+            {rows.map(({ icon, label, value }) => (
+              <div key={label}>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-0.5">{icon} {label}</p>
+                <p className="text-xs text-gray-700 leading-relaxed">{value || '—'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function PagePersonas({ analysis, personas, onUpdate, apiKey, onSetApiKey }) {
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState(null);
+      const [loadingOne, setLoadingOne] = useState(null);
+      const [localKey, setLocalKey] = useState('');
+      const [editingKey, setEditingKey] = useState(false);
+
+      const d = analysis.interneAnalyse?.doelgroep || {};
+      const hasData = d.gewensteDoelgroep || d.werkelijkeDoelgroep || d.gedrag;
+
+      useEffect(() => {
+        if (apiKey && !personas && !loading && hasData) generateAll();
+      }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+      async function generateAll() {
+        const key = apiKey || localKey;
+        if (!key) return;
+        setLoading(true); setError(null);
+        try {
+          const text = await callAnthropicAPI(key, [{ role: 'user', content: buildPersonaPrompt(analysis) }]);
+          onUpdate({ ...analysis, personas: parseJson(text) });
+        } catch (e) { setError(e.message || 'Onbekende fout'); }
+        finally { setLoading(false); }
+      }
+
+      async function refreshOne(personaKey) {
+        const key = apiKey || localKey;
+        if (!key) return;
+        setLoadingOne(personaKey); setError(null);
+        try {
+          const text = await callAnthropicAPI(key, [{ role: 'user', content: buildPersonaPrompt(analysis) }]);
+          const result = parseJson(text);
+          onUpdate({ ...analysis, personas: { ...(personas || {}), [personaKey]: result[personaKey] } });
+        } catch (e) { setError(e.message || 'Onbekende fout'); }
+        finally { setLoadingOne(null); }
+      }
+
+      function saveKey() { onSetApiKey(localKey.trim()); setEditingKey(false); if (localKey.trim() && !personas && hasData) generateAll(); }
+
+      if (!apiKey && !editingKey) {
+        return (
+          <div className="fade-in">
+            <h4 className="text-sm font-semibold text-gray-800 mb-4">Persona's</h4>
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+              <p className="text-sm font-semibold text-gray-800 mb-1">Anthropic API sleutel vereist</p>
+              <p className="text-xs text-gray-500 mb-4 leading-relaxed">Je sleutel wordt alleen lokaal opgeslagen en enkel gebruikt voor AI-generatie. Je vindt hem op <span className="text-gray-700 font-medium">console.anthropic.com</span>.</p>
+              <input
+                type="password" autoComplete="off"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition mb-3"
+                placeholder="sk-ant-..."
+                value={localKey}
+                onChange={e => setLocalKey(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && localKey.trim() && saveKey()}
+              />
+              <button
+                onClick={saveKey}
+                disabled={!localKey.trim()}
+                className="bg-gray-900 text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-40"
+              >Opslaan en genereren</button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="fade-in">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-semibold text-gray-800">Persona's</h4>
+            <div className="flex items-center gap-2">
+              {!editingKey && (
+                <button onClick={() => { setEditingKey(true); setLocalKey(''); }} className="text-xs text-gray-400 hover:text-gray-600 transition-colors border border-gray-200 rounded-lg px-2.5 py-1.5">
+                  API sleutel ✎
+                </button>
+              )}
+              {personas && (
+                <button onClick={generateAll} disabled={loading} className="inline-flex items-center gap-1 text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-40">
+                  {loading ? <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin inline-block" /> : '↻'} Genereer opnieuw
+                </button>
+              )}
+            </div>
+          </div>
+
+          {editingKey && (
+            <div className="mb-4 bg-white border border-gray-100 rounded-xl p-4">
+              <p className="text-xs text-gray-500 mb-2">API sleutel bijwerken:</p>
+              <div className="flex gap-2">
+                <input
+                  type="password" autoComplete="off"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                  placeholder="sk-ant-..."
+                  value={localKey}
+                  onChange={e => setLocalKey(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && localKey.trim() && saveKey()}
+                />
+                <button onClick={saveKey} disabled={!localKey.trim()} className="bg-gray-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-40">OK</button>
+                <button onClick={() => setEditingKey(false)} className="text-sm text-gray-400 hover:text-gray-600 px-2 transition-colors">✕</button>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+              <span className="text-red-400 shrink-0 mt-0.5">⚠</span>
+              <p className="text-xs text-red-700 flex-1 leading-relaxed">{error}</p>
+              <button onClick={generateAll} className="text-xs text-red-600 hover:text-red-800 font-semibold shrink-0">Opnieuw</button>
+            </div>
+          )}
+
+          {loading && !personas && (
+            <div className="flex flex-col items-center py-16 gap-3">
+              <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin" />
+              <p className="text-sm text-gray-400">Persona's worden gegenereerd...</p>
+            </div>
+          )}
+
+          {personas && (
+            <div className="space-y-4">
+              {['persona1','persona2'].map((key, idx) => (
+                <PersonaCard
+                  key={key}
+                  persona={personas[key]}
+                  label={`Persona ${idx + 1}`}
+                  isLoading={loadingOne === key}
+                  onRefresh={() => refreshOne(key)}
+                />
+              ))}
+            </div>
+          )}
+
+          {!personas && !loading && !error && (
+            <div className="text-center py-12">
+              {!hasData && <p className="text-xs text-gray-400 mb-4">Vul eerst de doelgroepsectie in voordat je persona's genereert.</p>}
+              {hasData && <p className="text-xs text-gray-400 mb-4">Klik om persona's te genereren op basis van de doelgroepdata.</p>}
+              <button onClick={generateAll} disabled={!hasData} className="bg-gray-900 text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-40">
+                ✦ Genereer persona's
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     const MAIN_TABS = [
       { id: 'samenvatting', label: 'Samenvatting' },
       { id: 'interne',      label: 'Interne Analyse' },
       { id: 'externe',      label: 'Externe Analyse' },
+      { id: 'personas',     label: "Persona's" },
     ];
 
     const INTERNE_TABS = [
@@ -1642,7 +2013,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       onEdit: PropTypes.func.isRequired,
     };
 
-    function DashboardScreen({ analysis, onBack, onEdit }) {
+    function DashboardScreen({ analysis, onBack, onEdit, onUpdate, apiKey, onSetApiKey }) {
       const [mainTab, setMainTab] = useState('samenvatting');
       const [interneTab, setInterneTab] = useState('organisatie');
       const [externeTab, setExterneTab] = useState('concurrentie');
@@ -1674,7 +2045,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           case 'strategisch':     return <PageStrategischeContent data={int.strategischeContent} insights={pi('strategisch')} />;
           case 'community':       return <PageCommunity data={int.communityAnalyse} insights={pi('community')} />;
           case 'middelen':        return <PageMiddelen data={int.middelen} insights={pi('middelen')} />;
-          case 'swot':            return <PageSwot data={int.swot} />;
+          case 'swot':            return <PageSwot data={int.swot} analysis={analysis} apiKey={apiKey} onUpdate={onUpdate} />;
           default:                return null;
         }
       };
@@ -1772,7 +2143,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           </div>
 
           {/* Sub-tab bar — alleen bij interne/externe */}
-          {mainTab !== 'samenvatting' && (
+          {(mainTab === 'interne' || mainTab === 'externe') && (
             <div className="bg-white border-b border-gray-100">
               <div className="max-w-2xl mx-auto px-4 py-2">
                 {mainTab === 'interne'
@@ -1786,7 +2157,10 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           {/* Content */}
           <div className="max-w-2xl mx-auto px-4 py-6">
             {mainTab === 'samenvatting' ? <PageSamenvatting analysis={analysis} allInsights={insights} /> :
-             mainTab === 'interne' ? renderInternePage() : renderExternePage()}
+             mainTab === 'interne'      ? renderInternePage() :
+             mainTab === 'externe'      ? renderExternePage() :
+             mainTab === 'personas'     ? <PagePersonas analysis={analysis} personas={analysis.personas} onUpdate={onUpdate} apiKey={apiKey} onSetApiKey={onSetApiKey} /> :
+             null}
           </div>
         </div>
       );
@@ -2470,6 +2844,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const [screen, setScreen] = useState('home'); // 'home' | 'dashboard' | 'form'
       const [viewing, setViewing] = useState(null);
       const [editing, setEditing] = useState(null);
+      const [apiKey, setApiKeyState] = useState(() => localStorage.getItem('ma_apikey') || '');
       const [analyses, setAnalyses] = useState(() => {
         try { return JSON.parse(localStorage.getItem('ma_analyses') || '[]'); }
         catch { return []; }
@@ -2503,6 +2878,17 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         setEditing(null);
       };
 
+      const handleSetApiKey = (key) => {
+        localStorage.setItem('ma_apikey', key);
+        setApiKeyState(key);
+      };
+
+      const handleUpdate = (updated) => {
+        const newList = analyses.map(a => a.id === updated.id ? updated : a);
+        persist(newList);
+        setViewing(updated);
+      };
+
       const handleDelete = (id) => {
         if (window.confirm('Deze analyse verwijderen?')) {
           persist(analyses.filter(a => a.id !== id));
@@ -2526,6 +2912,9 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             analysis={viewing}
             onBack={() => { setViewing(null); setScreen('home'); }}
             onEdit={() => { setEditing(viewing); setScreen('form'); }}
+            onUpdate={handleUpdate}
+            apiKey={apiKey}
+            onSetApiKey={handleSetApiKey}
           />
         );
       }
