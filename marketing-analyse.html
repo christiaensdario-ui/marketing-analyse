@@ -28,7 +28,7 @@
 
     // ─── Data structure ───────────────────────────────────────────────────────
     const emptyFormat = () => ({ count: '', uitleg: '', voorbeelden: '' });
-    const emptyCompetitor = () => ({ naam: '', positionering: '', branding: '', content: '', community: '', engagement: '', differentiatie: '', watDoenZijNiet: '' });
+    const emptyCompetitor = () => ({ naam: '', positionering: '', branding: '', content: '', community: '', engagementLikes: '', engagementComments: '', engagementVolgers: '', differentiatie: '', watDoenZijNiet: '' });
 
     const emptyData = () => ({
       interneAnalyse: {
@@ -202,6 +202,17 @@
       return ca.gemiddeldeEngagementRate || '';
     }
 
+    function getCompetitorEngagementRate(c) {
+      if (!c) return '';
+      const toNum = v => parseFloat(String(v || '').replace(/[^\d.,]/g,'').replace(',','.')) || 0;
+      const likes    = toNum(c.engagementLikes);
+      const comments = toNum(c.engagementComments);
+      const volgers  = toNum(c.engagementVolgers);
+      if (volgers > 0 && (likes + comments) > 0)
+        return (((likes + comments) / volgers) * 100).toFixed(2) + '%';
+      return '';
+    }
+
     function exportAnalysis(analysis) {
       const json = JSON.stringify(analysis, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
@@ -226,9 +237,9 @@
       const { interneAnalyse: int, externeAnalyse: ext, klantnaam, datum } = analysis;
       const ca = int.contentanalyse;
       const competitors = Array.isArray(ext.concurrentieanalyse) ? ext.concurrentieanalyse : [ext.concurrentieanalyse || {}];
-      const compLabels = ['Positionering','Branding','Content','Community','Engagement','Differentiatie','Wat doen zij NIET?'];
-      const compKeys   = ['positionering','branding','content','community','engagement','differentiatie','watDoenZijNiet'];
-      const compTable = `<table><thead><tr><th></th>${competitors.map((c,i)=>`<th>${escHtml(c.naam||`Concurrent ${i+1}`)}</th>`).join('')}</tr></thead><tbody>${compKeys.map((k,ri)=>`<tr><td><strong>${compLabels[ri]}</strong></td>${competitors.map(c=>`<td>${escHtml(c[k]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+      const compErVal = (c) => { const l=parseFloat(String(c.engagementLikes||'').replace(',','.'));const cm=parseFloat(String(c.engagementComments||'').replace(',','.'));const v=parseFloat(String(c.engagementVolgers||'').replace(',','.')); return v>0&&(l+cm)>0?((l+cm)/v*100).toFixed(2)+'% (publieke data)':'—'; };
+      const compRows = [['Positionering','positionering'],['Branding','branding'],['Content','content'],['Community','community'],['Differentiatie','differentiatie'],['Wat doen zij NIET?','watDoenZijNiet']];
+      const compTable = `<table><thead><tr><th></th>${competitors.map((c,i)=>`<th>${escHtml(c.naam||`Concurrent ${i+1}`)}</th>`).join('')}</tr></thead><tbody>${compRows.map(([label,key])=>`<tr><td><strong>${label}</strong></td>${competitors.map(c=>`<td>${escHtml(c[key]||'—')}</td>`).join('')}</tr>`).join('')}<tr><td><strong>Engagement (ER)</strong></td>${competitors.map(c=>`<td>${escHtml(compErVal(c))}</td>`).join('')}</tr></tbody></table>`;
       const dateStr = new Date(datum).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'});
       const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><title>${escHtml(klantnaam||'Analyse')}</title><style>
 *{box-sizing:border-box;margin:0;padding:0}@page{margin:2cm;size:A4}body{font-family:-apple-system,Arial,sans-serif;font-size:11px;color:#1f2937;line-height:1.5}
@@ -464,10 +475,15 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       children: PropTypes.node,
     };
 
-    function GroupLabel({ label }) {
-      return <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-2 pb-1 border-b border-gray-100">{label}</p>;
+    function GroupLabel({ label, tooltip }) {
+      return (
+        <div className="flex items-center gap-1 mt-5 mb-2 pb-1 border-b border-gray-100">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+          {tooltip && <Tooltip text={tooltip} />}
+        </div>
+      );
     }
-    GroupLabel.propTypes = { label: PropTypes.string.isRequired };
+    GroupLabel.propTypes = { label: PropTypes.string.isRequired, tooltip: PropTypes.string };
 
     // ─── Dashboard UI primitives ──────────────────────────────────────────────
     function DataRow({ label, value }) {
@@ -528,7 +544,9 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PerformancePanel({ data }) {
       const erStr = getEngagementRate(data);
       const erNum = parseEngagementRate(erStr);
-      const erc = engagementRateColor(erNum);
+      const erc = erStr ? engagementRateColor(erNum) : engagementRateColor(null);
+      const erMissing = (data.insightsAccess === 'ja' && !String(data.gemiddeldBereik || '').trim()) ||
+                        (data.insightsAccess === 'nee' && !String(data.aantalVolgers || '').trim());
       const erNote = data.insightsAccess === 'ja'
         ? 'Berekend via Instagram Insights (bereik).'
         : data.insightsAccess === 'nee'
@@ -555,10 +573,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                 <p className="text-xs font-medium text-gray-500">Engagement rate</p>
                 <Tooltip text="Onder 2% = laag, 2–5% = gemiddeld, boven 5% = goed — gebaseerd op industrie benchmark voor sociale media." />
               </div>
-              <p className={`text-2xl font-bold ${erc.text}`}>{erStr || '—'}</p>
-              {erNote && <p className="text-xs text-gray-400 mt-1 italic">{erNote}</p>}
+              {erMissing
+                ? <p className="text-sm text-gray-400 italic">Vul het vereiste veld in om de engagement rate te berekenen.</p>
+                : <p className={`text-2xl font-bold ${erc.text}`}>{erStr || '—'}</p>
+              }
+              {!erMissing && erNote && <p className="text-xs text-gray-400 mt-1 italic">{erNote}</p>}
             </div>
-            {erc.label && (
+            {!erMissing && erc.label && (
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>
                 {erc.label}
               </span>
@@ -1214,7 +1235,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         { key: 'branding',      label: 'Branding' },
         { key: 'content',       label: 'Content' },
         { key: 'community',     label: 'Community' },
-        { key: 'engagement',    label: 'Engagement' },
+        { key: null,            label: 'Engagement (ER)', render: c => getCompetitorEngagementRate(c) },
         { key: 'differentiatie',label: 'Differentiatie' },
         { key: 'watDoenZijNiet',label: 'Wat doen zij NIET?' },
       ];
@@ -1246,11 +1267,15 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                     <td className="text-xs font-semibold text-gray-500 py-3 pr-3 align-top sticky left-0 z-10 border-r border-gray-100" style={{ backgroundColor: 'inherit' }}>
                       {row.label}
                     </td>
-                    {list.map((c, i) => (
-                      <td key={i} className="text-xs text-gray-700 py-3 px-3 align-top border-l border-gray-100 leading-relaxed whitespace-pre-wrap">
-                        {c[row.key] || <span className="text-gray-300 italic">—</span>}
-                      </td>
-                    ))}
+                    {list.map((c, i) => {
+                      const val = row.render ? row.render(c) : c[row.key];
+                      return (
+                        <td key={i} className="text-xs text-gray-700 py-3 px-3 align-top border-l border-gray-100 leading-relaxed whitespace-pre-wrap">
+                          {val || <span className="text-gray-300 italic">—</span>}
+                          {row.render && val && <span className="block text-gray-400 italic mt-0.5">Berekend op basis van publieke data.</span>}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -1373,7 +1398,9 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       // Engagement rate
       const erStr = getEngagementRate(ca);
       const erNum = parseEngagementRate(erStr);
-      const erC = engagementRateColor(erNum);
+      const erMissing = (ca.insightsAccess === 'ja' && !String(ca.gemiddeldBereik || '').trim()) ||
+                        (ca.insightsAccess === 'nee' && !String(ca.aantalVolgers || '').trim());
+      const erC = erStr && !erMissing ? engagementRateColor(erNum) : engagementRateColor(null);
       const erNote = ca.insightsAccess === 'ja'
         ? 'Berekend via Instagram Insights (bereik).'
         : ca.insightsAccess === 'nee'
@@ -1441,9 +1468,12 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                 <p className="text-xs font-medium text-gray-500">Engagement rate</p>
                 <Tooltip text="Onder 2% = laag, 2–5% = gemiddeld, boven 5% = goed — industrie benchmark." />
               </div>
-              <p className={`text-3xl font-bold ${erC.text}`}>{erStr || '—'}</p>
-              {erC.label && <p className={`text-xs font-semibold mt-1 ${erC.text}`}>{erC.label}</p>}
-              {erNote && <p className="text-xs text-gray-400 mt-1 italic">{erNote}</p>}
+              {erMissing
+                ? <p className="text-sm text-gray-400 italic">Vul het vereiste veld in om de engagement rate te berekenen.</p>
+                : <p className={`text-3xl font-bold ${erC.text}`}>{erStr || '—'}</p>
+              }
+              {!erMissing && erC.label && <p className={`text-xs font-semibold mt-1 ${erC.text}`}>{erC.label}</p>}
+              {!erMissing && erNote && <p className="text-xs text-gray-400 mt-1 italic">{erNote}</p>}
             </div>
           </div>
 
@@ -1954,8 +1984,12 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                 </>
               );
             })()}
-            <GroupLabel label="Frequentie" />
-            <p className="text-xs text-gray-400 mb-3 -mt-1 italic">Gebaseerd op de laatste 4 weken.</p>
+            <GroupLabel label="Frequentie" tooltip="Posts zijn alle reguliere berichten op je feed. Stories zijn tijdelijke berichten die na 24 uur verdwijnen. Tel beide apart voor de laatste 4 weken." />
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2">
+              <span className="text-blue-400 shrink-0 mt-0.5 text-sm">ℹ</span>
+              <p className="text-xs text-blue-700 flex-1">Vul hieronder het totaal aantal posts en stories in van de afgelopen 4 weken. De app berekent automatisch het wekelijks gemiddelde.</p>
+              <Tooltip text="Tel alle posts en stories die je in de laatste 4 weken hebt geplaatst op het account. Kijk hiervoor in je Instagram profiel of in je contentkalender." />
+            </div>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Aantal posts</label>
@@ -2128,7 +2162,57 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                 <Field label="Branding" value={c.branding} onChange={v => setConcurrent(i,'branding',v)} rows={3} />
                 <Field label="Content" value={c.content} onChange={v => setConcurrent(i,'content',v)} rows={3} />
                 <Field label="Community" value={c.community} onChange={v => setConcurrent(i,'community',v)} rows={3} />
-                <Field label="Engagement" value={c.engagement} onChange={v => setConcurrent(i,'engagement',v)} rows={3} />
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Engagement</p>
+                  <div className="grid grid-cols-3 gap-3 mb-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Gem. likes</label>
+                      <input
+                        type="number" min="0"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        placeholder="bijv. 120"
+                        value={c.engagementLikes || ''}
+                        onChange={e => setConcurrent(i, 'engagementLikes', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Gem. comments</label>
+                      <input
+                        type="number" min="0"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        placeholder="bijv. 15"
+                        value={c.engagementComments || ''}
+                        onChange={e => setConcurrent(i, 'engagementComments', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Aantal volgers</label>
+                      <input
+                        type="number" min="0"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        placeholder="bijv. 5000"
+                        value={c.engagementVolgers || ''}
+                        onChange={e => setConcurrent(i, 'engagementVolgers', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  {(() => {
+                    const er = getCompetitorEngagementRate(c);
+                    if (!er) return <p className="text-xs text-gray-400 italic">Vul likes, comments en volgers in om de engagement rate te berekenen.</p>;
+                    const erNum = parseEngagementRate(er);
+                    const erc = engagementRateColor(erNum);
+                    return (
+                      <div className={`${erc.bg} border ${erc.border} rounded-xl px-4 py-3 flex items-center justify-between`}>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-0.5">Engagement rate (automatisch berekend)</p>
+                          <p className={`text-lg font-bold ${erc.text}`}>{er}</p>
+                          <p className="text-xs text-gray-400 italic mt-0.5">Berekend op basis van publieke data.</p>
+                        </div>
+                        {erc.label && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>{erc.label}</span>}
+                      </div>
+                    );
+                  })()}
+                </div>
                 <Field label="Differentiatie" value={c.differentiatie} onChange={v => setConcurrent(i,'differentiatie',v)} rows={3} />
                 <Field label="Wat doen zij NIET?" hint="Daar zit vaak jouw kans." value={c.watDoenZijNiet} onChange={v => setConcurrent(i,'watDoenZijNiet',v)} rows={3} />
               </div>
