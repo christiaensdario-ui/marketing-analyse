@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="nl">
 <head>
   <meta charset="UTF-8" />
@@ -29,10 +29,11 @@
     // ─── Data structure ───────────────────────────────────────────────────────
     const emptyFormat = () => ({ count: '', uitleg: '', voorbeelden: '' });
     const emptyCompetitor = () => ({ naam: '', positionering: '', branding: '', content: '', community: '', postsAantal: '', storiesAantal: '', engagementLikes: '', engagementComments: '', engagementShares: '', engagementVolgers: '', differentiatie: '', watDoenZijNiet: '' });
+    const emptyTeamlid = () => ({ naam: '', functietitel: '', rol: '', isLeader: false });
 
     const emptyData = () => ({
       interneAnalyse: {
-        organisatie: { labelType: '', geschiedenis: '', team: '', rollenManagement: '', werking: '' },
+        organisatie: { labelType: '', geschiedenis: '', teamleden: [], werking: '' },
         merkidentiteit: { visuelIdentiteit: '', toneOfVoice: '', consistentieBranding: '', waardenMissie: '', huidigePositionering: '' },
         kanaalstrategie: { actievePlatformen: '', onderbouwingPerPlatform: '', primairKanaal: '', ontbrekendeKanalen: '' },
         doelgroep: { wieVolgt: '', leeftijdInteresses: '', gedrag: '', engagement: '', communityInteractie: '', gewensteDoelgroep: '', werkelijkeDoelgroep: '' },
@@ -115,6 +116,7 @@
         interneAnalyse: {
           ...base.interneAnalyse,
           ...int,
+          organisatie: { ...base.interneAnalyse.organisatie, ...(int.organisatie || {}), teamleden: Array.isArray(int.organisatie?.teamleden) ? int.organisatie.teamleden : [] },
           kanaalstrategie: { ...base.interneAnalyse.kanaalstrategie, ...(int.kanaalstrategie || {}) },
           contentanalyse: migratedCa,
         },
@@ -406,6 +408,89 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       win.document.write(html);
       win.document.close();
       setTimeout(() => { win.focus(); win.print(); }, 400);
+    }
+
+    // ─── Filtered exports ─────────────────────────────────────────────────────
+    function exportPDFFiltered(analysis, sections) {
+      const { interneAnalyse: int, externeAnalyse: ext, klantnaam, datum } = analysis;
+      const ca = int.contentanalyse;
+      const dateStr = new Date(datum).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+      const competitors = Array.isArray(ext.concurrentieanalyse) ? ext.concurrentieanalyse : [ext.concurrentieanalyse || {}];
+      const compErVal = (c) => { const l=parseFloat(String(c.engagementLikes||'').replace(',','.'));const cm=parseFloat(String(c.engagementComments||'').replace(',','.'));const v=parseFloat(String(c.engagementVolgers||'').replace(',','.')); return v>0&&(l+cm)>0?((l+cm)/v*100).toFixed(2)+'% (publieke data)':'—'; };
+      const compPostsVal = (c) => { const n=Number(c.postsAantal); return n>0?`≈ ${(n/4).toFixed(1).replace('.0','')} per week (${n} in 4 weken)`:'—'; };
+      const compStoriesVal = (c) => { const n=Number(c.storiesAantal); return n>0?`≈ ${(n/4).toFixed(1).replace('.0','')} per week (${n} in 4 weken)`:'—'; };
+      const compRows = [['Positionering','positionering'],['Branding','branding'],['Content','content'],['Community','community'],['Differentiatie','differentiatie'],['Wat doen zij NIET?','watDoenZijNiet']];
+      const compTable = `<table><thead><tr><th></th>${competitors.map((c,i)=>`<th>${escHtml(c.naam||`Concurrent ${i+1}`)}</th>`).join('')}</tr></thead><tbody><tr><td><strong>Posts/week</strong></td>${competitors.map(c=>`<td>${escHtml(compPostsVal(c))}</td>`).join('')}</tr><tr><td><strong>Stories/week</strong></td>${competitors.map(c=>`<td>${escHtml(compStoriesVal(c))}</td>`).join('')}</tr>${compRows.map(([label,key])=>`<tr><td><strong>${label}</strong></td>${competitors.map(c=>`<td>${escHtml(c[key]||'—')}</td>`).join('')}</tr>`).join('')}<tr><td><strong>Engagement (ER)</strong></td>${competitors.map(c=>`<td>${escHtml(compErVal(c))}</td>`).join('')}</tr></tbody></table>`;
+      const erVal = (() => { const l=parseFloat(String(ca.gemiddeldeLikes||'').replace(',','.'));const c2=parseFloat(String(ca.gemiddeldeComments||'').replace(',','.'));const s2=parseFloat(String(ca.gemiddeldeShares||'').replace(',','.')); if(ca.insightsAccess==='ja'){const b=parseFloat(String(ca.gemiddeldBereik||'').replace(',','.')); return b>0&&(l+c2+s2)>0?((l+c2+s2)/b*100).toFixed(2)+'%':'';}if(ca.insightsAccess==='nee'){const v=parseFloat(String(ca.aantalVolgers||'').replace(',','.')); return v>0&&(l+c2)>0?((l+c2)/v*100).toFixed(2)+'%':'';}return ''; })();
+      const sectionHtml = {
+        samenvatting: `<h2>Samenvatting</h2>${pdfField('Klantnaam',klantnaam)}${pdfField('Datum analyse',dateStr)}${pdfField('Primair kanaal',int.kanaalstrategie?.primairKanaal)}${pdfField('Engagement rate',erVal)}${pdfField('Gewenste doelgroep',int.doelgroep?.gewensteDoelgroep)}${pdfField('Werkelijke doelgroep',int.doelgroep?.werkelijkeDoelgroep)}${pdfField('Kernwaarden / missie',int.merkidentiteit?.waardenMissie)}`,
+        organisatie: `<h2>A — Organisatie / structuur</h2>${pdfField('Type label / bedrijf',int.organisatie.labelType)}${pdfField('Geschiedenis',int.organisatie.geschiedenis)}${pdfField('Teamleden',Array.isArray(int.organisatie.teamleden)&&int.organisatie.teamleden.length?int.organisatie.teamleden.map(t=>`${t.naam}${t.functietitel?' ('+t.functietitel+')':''}`).join(', '):int.organisatie.team)}${pdfField('Werking',int.organisatie.werking)}`,
+        merkidentiteit: `<h2>B — Merkidentiteit</h2>${pdfField('Visuele identiteit',int.merkidentiteit.visuelIdentiteit)}${pdfField('Tone of voice',int.merkidentiteit.toneOfVoice)}${pdfField('Consistentie van branding',int.merkidentiteit.consistentieBranding)}${pdfField('Waarden en missie',int.merkidentiteit.waardenMissie)}${pdfField('Huidige positionering',int.merkidentiteit.huidigePositionering)}`,
+        kanalen: `<h2>C — Kanaalstrategie</h2>${pdfField('Actieve platformen',int.kanaalstrategie.actievePlatformen)}${pdfField('Onderbouwing per platform',int.kanaalstrategie.onderbouwingPerPlatform)}${pdfField('Primair kanaal',int.kanaalstrategie.primairKanaal)}${pdfField('Ontbrekende kanalen',int.kanaalstrategie.ontbrekendeKanalen)}`,
+        doelgroep: `<h2>D — Doelgroep</h2>${pdfField('Wie volgt het merk nu?',int.doelgroep.wieVolgt)}${pdfField('Leeftijd / interesses',int.doelgroep.leeftijdInteresses)}${pdfField('Gedrag',int.doelgroep.gedrag)}${pdfField('Engagement',int.doelgroep.engagement)}${pdfField('Community interactie',int.doelgroep.communityInteractie)}${pdfField('Gewenste doelgroep',int.doelgroep.gewensteDoelgroep)}${pdfField('Werkelijke doelgroep',int.doelgroep.werkelijkeDoelgroep)}`,
+        content: `<h2>E — Contentanalyse</h2>${pdfField('Posts (4 weken)',ca.frequentiePostsAantal)}${pdfField('Stories (4 weken)',ca.frequentieStoriesAantal)}${pdfField('Gem. likes',ca.gemiddeldeLikes)}${pdfField('Gem. comments',ca.gemiddeldeComments)}${pdfField('Gem. shares',ca.gemiddeldeShares)}${pdfField('Engagement rate',erVal)}${pdfField('Formats — Foto',ca.formatsFoto?.uitleg)}${pdfField('Formats — Video',ca.formatsVideo?.uitleg)}${pdfField('Formats — Reels',ca.formatsReels?.uitleg)}${pdfField('Formats — Carousels',ca.formatsCarousels?.uitleg)}`,
+        strategie: `<h2>G — Strategische contentanalyse</h2>${pdfField('Positioneringsconsistentie',int.strategischeContent.positioneringsconsistentie)}${pdfField('Tone of voice',int.strategischeContent.toneOfVoice)}${pdfField('Storytelling',int.strategischeContent.storytelling)}${pdfField('Emotie',int.strategischeContent.emotie)}${pdfField('Doelgroepresonantie',int.strategischeContent.doelgroepresonantie)}${pdfField('Formatstrategie',int.strategischeContent.formatstrategie)}`,
+        community: `<h2>H — Community analyse</h2>${pdfField('Interactie in comments',int.communityAnalyse.interactieComments)}${pdfField('Terugkerende fans',int.communityAnalyse.terugkerendeFans)}${pdfField('User generated content',int.communityAnalyse.userGeneratedContent)}${pdfField('DM interacties',int.communityAnalyse.dmInteracties)}${pdfField('Community betrokkenheid',int.communityAnalyse.communityBetrokkenheid)}${pdfField('Publiek of echte community?',int.communityAnalyse.publiefOfCommunity)}`,
+        middelen: `<h2>I — Middelen</h2>${pdfField('Budget',int.middelen.budget)}${pdfField('Tijd',int.middelen.tijd)}${pdfField('Team',int.middelen.team)}${pdfField('Netwerk',int.middelen.netwerk)}${pdfField('Skills',int.middelen.skills)}`,
+        swot: `<h2>J — SWOT</h2><div class="grid2"><div class="sc sc-s"><div class="sl">Strengths</div>${escHtml(int.swot.strengths||'—').replace(/\n/g,'<br>')}</div><div class="sc sc-w"><div class="sl">Weaknesses</div>${escHtml(int.swot.weaknesses||'—').replace(/\n/g,'<br>')}</div><div class="sc sc-o"><div class="sl">Opportunities</div>${escHtml(int.swot.opportunities||'—').replace(/\n/g,'<br>')}</div><div class="sc sc-t"><div class="sl">Threats</div>${escHtml(int.swot.threats||'—').replace(/\n/g,'<br>')}</div></div>`,
+        concurrentie: `<h2>A — Concurrentieanalyse</h2>${compTable}`,
+        samenwerkingen: `<h2>B — Samenwerkingen en netwerk</h2>${pdfField('Potentiële partners',ext.samenwerkingen.potentielePartners)}${pdfField('Gatekeepers in de scene',ext.samenwerkingen.gatekeepers)}${pdfField('Bestaande samenwerkingen',ext.samenwerkingen.bestaandeSamenwerkingen)}${pdfField('Ontbrekende samenwerkingen',ext.samenwerkingen.ontbrekendeSamenwerkingen)}`,
+        markt: `<h2>C — Markt / scene analyse</h2>${pdfField('Grootte van de scene',ext.marktSceneAnalyse.grootteScene)}${pdfField('Populariteit van het genre',ext.marktSceneAnalyse.populariteitGenre)}${pdfField('Aantal events',ext.marktSceneAnalyse.aantalEvents)}${pdfField('Andere labels / collectieven',ext.marktSceneAnalyse.andereLabels)}${pdfField('Marktverzadiging',ext.marktSceneAnalyse.marktverzadiging)}`,
+        doelgroepgedrag: `<h2>D — Doelgroepgedrag</h2>${pdfField('Hoe ontdekken ze muziek?',ext.doelgroepgedrag.ontdekkingMuziek)}${pdfField('Welke platformen gebruiken ze?',ext.doelgroepgedrag.platformgebruik)}${pdfField('Wat motiveert hen?',ext.doelgroepgedrag.motivatie)}${pdfField('Wie beïnvloedt hen?',ext.doelgroepgedrag.invloeden)}`,
+        trends: `<h2>E — Culturele trends</h2>${pdfField('Stijgende populariteit van een genre',ext.cultureleTrends.genrePopulariteit)}${pdfField('Nostalgie trends',ext.cultureleTrends.nostalgieTrends)}${pdfField('DIY cultuur',ext.cultureleTrends.diyCultuur)}${pdfField('Authenticiteit vs commercialisering',ext.cultureleTrends.authenticiteitVsCommercialisering)}`,
+        personas: (() => {
+          const ps = analysis.personas;
+          if (!ps) return '<h2>Persona\'s</h2><p style="color:#9ca3af;font-style:italic;font-size:11px">Geen persona\'s gegenereerd.</p>';
+          const keys = ['persona1','persona2','persona3','persona4'];
+          const labels = { persona1:'Kernklant', persona2:'Aspirationele klant', persona3:'Randgeval', persona4:'Conflictpersona' };
+          return '<h2>Persona\'s</h2>' + keys.filter(k => ps[k]).map(k => {
+            const p = ps[k];
+            return `<div style="margin-bottom:14px;border:1px solid #e5e7eb;border-radius:6px;padding:10px;page-break-inside:avoid"><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:3px">${labels[k]}</div><div style="font-size:13px;font-weight:700;margin-bottom:4px">${escHtml(p.naam||'—')}</div><div style="font-size:10px;color:#374151;margin-bottom:5px">${escHtml(p.bio||'—')}</div>${p.quote?`<div style="font-size:10px;font-style:italic;color:#6b7280;border-left:3px solid #e5e7eb;padding-left:8px">"${escHtml(p.quote)}"</div>`:''}</div>`;
+          }).join('');
+        })(),
+      };
+      const ORDER = ['samenvatting','organisatie','merkidentiteit','kanalen','doelgroep','content','strategie','community','middelen','swot','concurrentie','samenwerkingen','markt','doelgroepgedrag','trends','personas'];
+      const parts = ORDER.filter(id => sections.has(id)).map((id, i) => (i > 0 ? '<div class="pb"></div>' : '') + sectionHtml[id]);
+      const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"><title>${escHtml(klantnaam||'Analyse')}</title><style>
+*{box-sizing:border-box;margin:0;padding:0}@page{margin:2cm;size:A4}body{font-family:-apple-system,Arial,sans-serif;font-size:11px;color:#1f2937;line-height:1.5}
+.hdr{margin-bottom:24px;padding-bottom:14px;border-bottom:3px solid #1f2937}.hdr h1{font-size:24px;font-weight:800;margin-bottom:3px}.hdr .meta{color:#6b7280;font-size:11px}
+h2{font-size:13px;font-weight:700;margin:20px 0 8px;padding:5px 10px;background:#f9fafb;border-left:3px solid #374151}
+.f{margin-bottom:9px;page-break-inside:avoid}.fl{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:2px}.fv{font-size:11px}.em{color:#d1d5db;font-style:italic;font-size:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}.sc{border:1px solid #e5e7eb;border-radius:6px;padding:10px}.sc-s{background:#f0fdf4}.sc-w{background:#fef2f2}.sc-o{background:#eff6ff}.sc-t{background:#fffbeb}
+.sl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}.sc-s .sl{color:#059669}.sc-w .sl{color:#dc2626}.sc-o .sl{color:#2563eb}.sc-t .sl{color:#d97706}
+table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{border:1px solid #e5e7eb;padding:5px 8px;text-align:left;vertical-align:top}th{background:#f9fafb;font-weight:600}
+.pb{page-break-before:always}
+</style></head><body>
+<div class="hdr"><h1>${escHtml(klantnaam||'Naamloos')}</h1><div class="meta">Marketing Analyse · ${dateStr}</div></div>
+${parts.join('\n')}</body></html>`;
+      const win = window.open('', '_blank');
+      if (!win) { alert('Pop-up geblokkeerd. Sta pop-ups toe voor deze pagina om PDF te exporteren.'); return; }
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => { win.focus(); win.print(); }, 400);
+    }
+
+    function exportJSONFiltered(analysis, sections) {
+      const { interneAnalyse: int, externeAnalyse: ext, klantnaam, datum, id, personas, aiSwot } = analysis;
+      const result = { klantnaam, datum, id };
+      const internMap = { organisatie:'organisatie', merkidentiteit:'merkidentiteit', kanalen:'kanaalstrategie', doelgroep:'doelgroep', content:'contentanalyse', strategie:'strategischeContent', community:'communityAnalyse', middelen:'middelen', swot:'swot' };
+      const externMap = { concurrentie:'concurrentieanalyse', samenwerkingen:'samenwerkingen', markt:'marktSceneAnalyse', doelgroepgedrag:'doelgroepgedrag', trends:'cultureleTrends' };
+      const internData = {};
+      for (const [sid, key] of Object.entries(internMap)) { if (sections.has(sid)) internData[key] = int[key]; }
+      const externData = {};
+      for (const [sid, key] of Object.entries(externMap)) { if (sections.has(sid)) externData[key] = ext[key]; }
+      if (Object.keys(internData).length) result.interneAnalyse = internData;
+      if (Object.keys(externData).length) result.externeAnalyse = externData;
+      if (sections.has('personas') && personas) result.personas = personas;
+      if (sections.has('swot') && aiSwot) result.aiSwot = aiSwot;
+      const json = JSON.stringify(result, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `analyse-${(klantnaam||'export').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     // ─── Insights detection ───────────────────────────────────────────────────
@@ -701,17 +786,27 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           ? 'Indicatieve score — berekend op basis van publieke data (volgers).'
           : null;
       const metrics = [
-        { label: 'Likes',    value: data.gemiddeldeLikes },
-        { label: 'Comments', value: data.gemiddeldeComments },
-        { label: 'Shares',   value: data.gemiddeldeShares },
+        { label: 'Likes',    value: data.gemiddeldeLikes,    color: '#3b82f6' },
+        { label: 'Comments', value: data.gemiddeldeComments, color: '#8b5cf6' },
+        { label: 'Shares',   value: data.gemiddeldeShares,   color: '#10b981' },
       ];
+      // Parse numeric values for proportional bars — shows engagement type distribution
+      // visualization-expert: relative bars make comparisons scannable without reading numbers
+      const toN = v => parseFloat(String(v || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+      const vals = metrics.map(m => toN(m.value));
+      const maxVal = Math.max(...vals, 1);
       return (
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             {metrics.map((m, i) => (
               <div key={i} className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
                 <p className="text-lg font-bold text-gray-900 truncate">{m.value || '—'}</p>
-                <p className="text-xs text-gray-400 mt-1">{m.label}</p>
+                <p className="text-xs text-gray-400 mt-1 mb-2">{m.label}</p>
+                {/* Proportional bar: shows relative distribution of engagement types */}
+                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: vals[i] > 0 ? `${(vals[i] / maxVal) * 100}%` : '0%', backgroundColor: m.color }} />
+                </div>
               </div>
             ))}
           </div>
@@ -916,19 +1011,33 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
 
     // ─── Insight card ─────────────────────────────────────────────────────────
     const INSIGHT_COLORS = {
-      tension:     { bg: 'bg-orange-50', border: 'border-orange-200', title: 'text-orange-700', text: 'text-orange-800' },
-      opportunity: { bg: 'bg-blue-50',   border: 'border-blue-200',   title: 'text-blue-700',   text: 'text-blue-800'   },
-      urgent:      { bg: 'bg-red-50',    border: 'border-red-200',    title: 'text-red-700',    text: 'text-red-800'    },
+      tension:     { bg: 'bg-orange-50', border: 'border-orange-200', title: 'text-orange-700', text: 'text-orange-800', tag: 'bg-orange-100 text-orange-700', stripe: 'bg-orange-400' },
+      opportunity: { bg: 'bg-blue-50',   border: 'border-blue-200',   title: 'text-blue-700',   text: 'text-blue-800',   tag: 'bg-blue-100 text-blue-700',   stripe: 'bg-blue-400'   },
+      urgent:      { bg: 'bg-red-50',    border: 'border-red-200',    title: 'text-red-700',    text: 'text-red-800',    tag: 'bg-red-100 text-red-700',    stripe: 'bg-red-500'    },
     };
+    // visualization-expert: type labels + left stripe make urgency/type scannable at a glance
+    // without needing to read the content — pre-attentive visual encoding via color + position
+    const INSIGHT_TYPE_LABELS = { tension: 'Spanningsveld', opportunity: 'Kans', urgent: 'Urgent' };
 
     function InsightCard({ insight }) {
       const c = INSIGHT_COLORS[insight.type] || INSIGHT_COLORS.opportunity;
       return (
-        <div className={`rounded-xl p-4 flex gap-3 items-start border ${c.bg} ${c.border}`}>
-          <span className="text-base shrink-0 mt-0.5" aria-hidden="true">{insight.icon}</span>
-          <div>
-            <p className={`text-xs font-bold mb-1 ${c.title}`}>{insight.title}</p>
-            <p className={`text-xs leading-relaxed ${c.text}`}>{insight.text}</p>
+        <div className={`rounded-xl border ${c.border} overflow-hidden flex`}>
+          {/* Left color stripe: encodes urgency type pre-attentively via color + thickness */}
+          <div className={`w-1 shrink-0 ${c.stripe}`} />
+          <div className={`flex-1 p-4 ${c.bg}`}>
+            <div className="flex items-start gap-3">
+              <span className="text-base shrink-0 mt-0.5" aria-hidden="true">{insight.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className={`text-xs font-bold ${c.title}`}>{insight.title}</p>
+                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ml-auto shrink-0 ${c.tag}`}>
+                    {INSIGHT_TYPE_LABELS[insight.type] || insight.type}
+                  </span>
+                </div>
+                <p className={`text-xs leading-relaxed ${c.text}`}>{insight.text}</p>
+              </div>
+            </div>
           </div>
         </div>
       );
@@ -977,90 +1086,419 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     // ─── Org chart (SVG boomstructuur) ───────────────────────────────────────
-    function OrgChart({ team, rollen, werking }) {
-      const members = (team || '').split(/[,\n]+/).map(m => m.trim()).filter(Boolean);
-      const hasData = members.length > 0 || rollen || werking;
+    function OrgChart({ teamleden, team, rollen, werking }) {
+      const [activeIdx, setActiveIdx] = useState(null);
+      const descRef = useRef(null);
+
+      // Resolve members: prefer teamleden array, fallback to old text parsing
+      let members = [];
+      if (Array.isArray(teamleden) && teamleden.some(m => m.naam || m.functietitel)) {
+        members = teamleden.filter(m => m.naam || m.functietitel);
+      } else if (team) {
+        const parsed = String(team).split(/[,\n]+/).map(m => m.trim()).filter(Boolean);
+        members = parsed.map((n, i) => ({ naam: n, functietitel: '', rol: '', isLeader: i === 0 }));
+      }
+
+      const hasData = members.length > 0 || werking;
       if (!hasData) return <p className="text-sm text-gray-300 italic text-center py-3">—</p>;
 
-      const lead = members[0];
-      const rest = members.slice(1);
-
-      const NW = 130, NH = 52, GAP = 14, TOP = 12, VGAP = 38;
+      const leaderIdx = members.findIndex(m => m.isLeader);
+      const leader = leaderIdx >= 0 ? members[leaderIdx] : members[0];
+      const rest = members.filter(m => m !== leader);
       const restCount = rest.length;
-      const totalRW = restCount > 0 ? restCount * NW + Math.max(0, restCount - 1) * GAP : 0;
-      const svgW = Math.max(NW + 40, totalRW + 40);
+      const leaderOrigIdx = members.indexOf(leader);
+      const restOrigIdxs = rest.map(m => members.indexOf(m));
+
+      const handleNodeClick = (origIdx) => {
+        setActiveIdx(origIdx);
+        setTimeout(() => {
+          if (descRef.current) descRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 60);
+      };
+
+      // Compact bubbels — scaled via viewBox so ze altijd op pagina passen
+      const NW = 90, NH = 42, H_GAP = 6, VGAP = 34, TOP = 8;
+      const totalRestW = restCount > 0 ? restCount * NW + Math.max(0, restCount - 1) * H_GAP : 0;
+      const svgW = Math.max(NW + 20, totalRestW + 20);
       const cx = svgW / 2;
       const leadX = cx - NW / 2;
       const leadY = TOP;
       const hBarY = leadY + NH + Math.floor(VGAP / 2);
       const restY = leadY + NH + VGAP;
-      const restStartX = restCount > 0 ? (svgW - totalRW) / 2 : 0;
-      const treeH = restCount > 0 ? restY + NH + TOP : leadY + NH + TOP;
-      const trunc = (s, max = 15) => s.length > max ? s.slice(0, max - 1) + '…' : s;
+      const restStartX = restCount > 0 ? (svgW - totalRestW) / 2 : 0;
+      const treeH = restCount > 0 ? restY + NH + TOP + 4 : leadY + NH + TOP + 4;
+      const trunc = (s, max) => !s ? '' : s.length > max ? s.slice(0, max - 1) + '…' : s;
+
+      const hasDescriptions = members.some(m => m.rol);
 
       return (
-        <div className="space-y-0">
-          {/* SVG tree */}
-          <div className="overflow-x-auto">
-            <svg width={svgW} height={treeH} className="block mx-auto" style={{ minWidth: 200 }}>
-              {/* Lead node */}
-              {lead && (
-                <g>
-                  <rect x={leadX} y={leadY} width={NW} height={NH} rx="10" fill="#111827" />
-                  <text x={cx} y={leadY + 17} textAnchor="middle" fill="#6b7280" fontSize="8" fontWeight="700" letterSpacing="0.07em">EINDVERANTWOORDELIJKE</text>
-                  <text x={cx} y={leadY + 35} textAnchor="middle" fill="white" fontSize="12.5" fontWeight="600">{trunc(lead)}</text>
-                  <title>{lead}</title>
-                </g>
-              )}
-              {/* Vertical line from lead down */}
-              {lead && restCount > 0 && (
-                <line x1={cx} y1={leadY + NH} x2={cx} y2={hBarY} stroke="#d1d5db" strokeWidth="1.5" />
-              )}
-              {/* Horizontal bar */}
-              {restCount > 1 && (
-                <line
-                  x1={restStartX + NW / 2} y1={hBarY}
-                  x2={restStartX + (restCount - 1) * (NW + GAP) + NW / 2} y2={hBarY}
-                  stroke="#d1d5db" strokeWidth="1.5"
+        <div>
+          {/* SVG organogram — viewBox zorgt dat het altijd past zonder scroll */}
+          <svg
+            viewBox={`0 0 ${svgW} ${treeH}`}
+            width="100%" preserveAspectRatio="xMidYMid meet"
+            style={{ display: 'block', overflow: 'visible' }}
+          >
+            {/* Leader node */}
+            {leader && (
+              <g onClick={() => handleNodeClick(leaderOrigIdx)} style={{ cursor: 'pointer' }}>
+                <rect
+                  x={leadX} y={leadY} width={NW} height={NH} rx="8"
+                  fill={activeIdx === leaderOrigIdx ? '#1d4ed8' : '#111827'}
+                  stroke={activeIdx === leaderOrigIdx ? '#3b82f6' : 'none'}
+                  strokeWidth="2"
                 />
-              )}
-              {/* Rest member nodes */}
-              {rest.map((m, i) => {
-                const nx = restStartX + i * (NW + GAP);
-                const midX = nx + NW / 2;
-                return (
-                  <g key={i}>
-                    <line x1={midX} y1={hBarY} x2={midX} y2={restY} stroke="#d1d5db" strokeWidth="1.5" />
-                    <rect x={nx} y={restY} width={NW} height={NH} rx="8" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1.5" />
-                    <text x={midX} y={restY + 31} textAnchor="middle" fill="#374151" fontSize="12" fontWeight="500">{trunc(m)}</text>
-                    <title>{m}</title>
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
+                {leader.functietitel
+                  ? <>
+                      <text x={cx} y={leadY + 14} textAnchor="middle" fill="#9ca3af" fontSize="7" fontWeight="700" letterSpacing="0.07em">
+                        {trunc(leader.functietitel.toUpperCase(), 14)}
+                      </text>
+                      <text x={cx} y={leadY + 30} textAnchor="middle" fill="white" fontSize="11" fontWeight="600">
+                        {trunc(leader.naam || 'Teamleader', 13)}
+                      </text>
+                    </>
+                  : <text x={cx} y={leadY + 25} textAnchor="middle" fill="white" fontSize="11" fontWeight="600">
+                      {trunc(leader.naam || 'Teamleader', 13)}
+                    </text>
+                }
+                <title>{[leader.naam, leader.functietitel].filter(Boolean).join(' · ')}</title>
+              </g>
+            )}
 
-          {/* Rollen block — gestippelde verbinding */}
-          {rollen && (
-            <div className="flex flex-col items-center">
-              <div className="w-px h-6" style={{ borderLeft: '2px dashed #d1d5db' }} />
-              <div className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
+            {/* Verticale lijn omlaag */}
+            {leader && restCount > 0 && (
+              <line x1={cx} y1={leadY + NH} x2={cx} y2={hBarY} stroke="#d1d5db" strokeWidth="1.5" />
+            )}
+
+            {/* Horizontale balk */}
+            {restCount > 1 && (
+              <line
+                x1={restStartX + NW / 2} y1={hBarY}
+                x2={restStartX + (restCount - 1) * (NW + H_GAP) + NW / 2} y2={hBarY}
+                stroke="#d1d5db" strokeWidth="1.5"
+              />
+            )}
+
+            {/* Teamlid bubbels */}
+            {rest.map((m, i) => {
+              const origIdx = restOrigIdxs[i];
+              const nx = restStartX + i * (NW + H_GAP);
+              const midX = nx + NW / 2;
+              const isActive = activeIdx === origIdx;
+              return (
+                <g key={i} onClick={() => handleNodeClick(origIdx)} style={{ cursor: 'pointer' }}>
+                  <line x1={midX} y1={hBarY} x2={midX} y2={restY} stroke="#d1d5db" strokeWidth="1.5" />
+                  <rect
+                    x={nx} y={restY} width={NW} height={NH} rx="7"
+                    fill={isActive ? '#eff6ff' : 'white'}
+                    stroke={isActive ? '#3b82f6' : '#374151'}
+                    strokeWidth={isActive ? '2' : '1.5'}
+                  />
+                  {m.functietitel
+                    ? <>
+                        <text x={midX} y={restY + 14} textAnchor="middle" fill="#9ca3af" fontSize="7" fontWeight="600" letterSpacing="0.06em">
+                          {trunc(m.functietitel.toUpperCase(), 14)}
+                        </text>
+                        <text x={midX} y={restY + 30} textAnchor="middle" fill="#111827" fontSize="11" fontWeight="500">
+                          {trunc(m.naam || '—', 13)}
+                        </text>
+                      </>
+                    : <text x={midX} y={restY + 25} textAnchor="middle" fill="#111827" fontSize="11" fontWeight="500">
+                        {trunc(m.naam || '—', 13)}
+                      </text>
+                  }
+                  <title>{[m.naam, m.functietitel].filter(Boolean).join(' · ')}</title>
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Beslissingsproces — aparte stijl, gestippelde lijn, duidelijk onderscheiden */}
+          {werking && (
+            <div className="flex flex-col items-center mt-1">
+              <div className="w-px h-5" style={{ borderLeft: '2px dashed #93c5fd' }} />
+              <div className="w-full bg-blue-50 border-2 border-blue-300 rounded-2xl px-4 py-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-blue-400 text-sm leading-none">⚙️</span>
+                  <p className="text-xs font-bold text-blue-600 uppercase tracking-wide">Beslissingsproces</p>
+                </div>
+                <p className="text-xs text-gray-700 leading-relaxed">{werking}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Backward compat: old rollen tekst */}
+          {rollen && !(Array.isArray(teamleden) && teamleden.length > 0) && (
+            <div className="flex flex-col items-center mt-1">
+              <div className="w-px h-5" style={{ borderLeft: '2px dashed #d1d5db' }} />
+              <div className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Rollen &amp; verantwoordelijkheden</p>
                 <p className="text-xs text-gray-600 leading-relaxed">{rollen}</p>
               </div>
             </div>
           )}
 
-          {/* Werking block — gestippelde verbinding */}
-          {werking && (
-            <div className="flex flex-col items-center mt-2">
-              <div className="w-px h-6" style={{ borderLeft: '2px dashed #d1d5db' }} />
-              <div className="w-full bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
-                <p className="text-xs font-semibold text-blue-600 mb-1">⚙️ Beslissingsproces</p>
-                <p className="text-xs text-gray-700 leading-relaxed">{werking}</p>
+          {/* Functiebeschrijvingen sectie — scroll doel bij klik op bubbel */}
+          {hasDescriptions && (
+            <div ref={descRef} className="mt-4 pt-3 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Functiebeschrijvingen</p>
+              <div className="space-y-2">
+                {members.map((m, origIdx) => {
+                  if (!m.rol) return null;
+                  const isActive = activeIdx === origIdx;
+                  return (
+                    <div
+                      key={origIdx}
+                      className={`rounded-xl p-3 border transition-all duration-150 ${
+                        isActive ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-100 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        {m.isLeader && (
+                          <span className="text-xs bg-gray-900 text-white px-2 py-0.5 rounded-full shrink-0">Teamleader</span>
+                        )}
+                        <p className="text-xs font-semibold text-gray-800">{m.naam || '—'}</p>
+                        {m.functietitel && <span className="text-xs text-gray-400">· {m.functietitel}</span>}
+                      </div>
+                      <p className="text-xs text-gray-600 leading-relaxed">{m.rol}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
+        </div>
+      );
+    }
+
+    // ─── Team editor (form) ───────────────────────────────────────────────────
+    function TeamEditor({ value, onChange }) {
+      const MAX = 10;
+      const teamleden = Array.isArray(value) ? value : [];
+
+      const add = () => {
+        if (teamleden.length >= MAX) return;
+        const isFirst = teamleden.length === 0;
+        onChange([...teamleden, { ...emptyTeamlid(), isLeader: isFirst }]);
+      };
+
+      const remove = (i) => {
+        const updated = teamleden.filter((_, idx) => idx !== i);
+        // If we removed the leader, assign to first remaining
+        if (teamleden[i]?.isLeader && updated.length > 0 && !updated.some(m => m.isLeader)) {
+          updated[0] = { ...updated[0], isLeader: true };
+        }
+        onChange(updated);
+      };
+
+      const update = (i, key, val) => {
+        onChange(teamleden.map((m, idx) => idx === i ? { ...m, [key]: val } : m));
+      };
+
+      const setLeader = (i) => {
+        onChange(teamleden.map((m, idx) => ({ ...m, isLeader: idx === i })));
+      };
+
+      return (
+        <div className="mb-4">
+          {teamleden.length === 0 ? (
+            <p className="text-sm text-gray-400 italic text-center py-3 mb-3">Nog geen teamleden toegevoegd.</p>
+          ) : (
+            <div className="space-y-3 mb-3">
+              {teamleden.map((m, i) => (
+                <div key={i} className={`border rounded-xl p-4 ${m.isLeader ? 'border-gray-800 bg-gray-50' : 'border-gray-100 bg-white'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                      Teamlid {i + 1}
+                      {m.isLeader && <span className="bg-gray-900 text-white text-xs px-2 py-0.5 rounded-full">Teamleader</span>}
+                    </span>
+                    <button type="button" onClick={() => remove(i)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Verwijder</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Naam</label>
+                      <input
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        value={m.naam}
+                        onChange={e => update(i, 'naam', e.target.value)}
+                        placeholder="Voornaam Achternaam"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Functietitel</label>
+                      <input
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        value={m.functietitel}
+                        onChange={e => update(i, 'functietitel', e.target.value)}
+                        placeholder="bijv. Creative Director"
+                      />
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Rol / verantwoordelijkheid</label>
+                    <input
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                      value={m.rol}
+                      onChange={e => update(i, 'rol', e.target.value)}
+                      placeholder="Korte beschrijving van de rol"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!m.isLeader}
+                      onChange={e => { if (e.target.checked) setLeader(i); }}
+                      className="accent-gray-800"
+                    />
+                    <span className="text-sm text-gray-700">Dit is de teamleader</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+          {teamleden.length < MAX && (
+            <button
+              type="button"
+              onClick={add}
+              className="w-full border border-dashed border-gray-300 rounded-xl py-3 text-sm text-gray-400 hover:border-gray-500 hover:text-gray-600 transition-colors"
+            >
+              + Voeg teamlid toe
+            </button>
+          )}
+          <p className="text-xs text-gray-400 mt-2">{teamleden.length}/{MAX} teamleden</p>
+        </div>
+      );
+    }
+
+    // ─── Section health score helpers ────────────────────────────────────────
+    function computeSectionHealth(values) {
+      let positive = 0, total = 0;
+      for (const v of values) {
+        const b = detectBadge ? detectBadge(v) : null;
+        if (b) { total++; if (b.bg === 'bg-emerald-50') positive++; }
+      }
+      return { positive, total };
+    }
+
+    function SectionHealthBadge({ positive, total }) {
+      if (total === 0) return null;
+      const allPos = positive === total;
+      const cls = allPos
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        : positive === 0
+          ? 'bg-red-50 text-red-600 border-red-200'
+          : 'bg-amber-50 text-amber-700 border-amber-200';
+      return (
+        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full border ml-1 ${cls}`}>
+          {positive}/{total}
+        </span>
+      );
+    }
+
+    // ─── Competitor radar score helpers ──────────────────────────────────────
+    function scoreTextVeld(text) {
+      if (!text || !String(text).trim()) return 1;
+      const t = String(text).toLowerCase();
+      const pos = ['sterk', 'hoog', 'actief', 'goed', 'uitstekend', 'groot', 'veel', 'consistent', 'professioneel', 'uniek', 'innovatief', 'top', 'stijgend', 'groeiend', 'scherp', 'duidelijk'];
+      const neg = ['laag', 'zwak', 'weinig', 'geen', 'beperkt', 'matig', 'nauwelijks', 'slecht', 'afwezig', 'minimaal', 'ontbreekt', 'onduidelijk'];
+      const posCount = pos.filter(w => t.includes(w)).length;
+      const negCount = neg.filter(w => t.includes(w)).length;
+      const net = posCount - negCount;
+      if (net >= 2) return 5;
+      if (net === 1) return 4;
+      if (net === 0 && (posCount > 0 || negCount > 0)) return 3;
+      if (net === -1) return 2;
+      if (net <= -2) return 1;
+      return String(text).trim().length > 10 ? 3 : 1;
+    }
+
+    function erToRadarScore(erStr) {
+      const n = parseEngagementRate(erStr);
+      if (n === null) return 1;
+      if (n >= 8) return 5;
+      if (n >= 5) return 4;
+      if (n >= 2) return 3;
+      if (n >= 1) return 2;
+      return 1;
+    }
+
+    // ─── Concurrentie radar diagram ───────────────────────────────────────────
+    function ConcurrentieRadar({ data }) {
+      const list = Array.isArray(data) ? data : [data];
+      const hasAny = list.some(c => c.naam);
+      if (!hasAny) return null;
+
+      const AXES = ['Positionering', 'Content', 'Community', 'Engagement', 'Differentiatie'];
+      const N = AXES.length;
+      const CX = 120, CY = 115, R = 85;
+      const COLORS = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#f43f5e'];
+
+      const angleFor = i => ((i * 360 / N) - 90) * Math.PI / 180;
+      const pt = (i, r) => ({
+        x: +(CX + r * Math.cos(angleFor(i))).toFixed(2),
+        y: +(CY + r * Math.sin(angleFor(i))).toFixed(2),
+      });
+
+      const scores = list.map(c => [
+        scoreTextVeld(c.positionering),
+        scoreTextVeld(c.content),
+        scoreTextVeld(c.community),
+        erToRadarScore(getCompetitorEngagementRate(c)),
+        scoreTextVeld(c.differentiatie),
+      ]);
+
+      const svgW = CX * 2 + 10;
+      const svgH = CY * 2 + 15;
+
+      return (
+        <div className="mb-6">
+          <div className="flex justify-center overflow-x-auto">
+            <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
+              {/* Grid pentagons */}
+              {[1,2,3,4,5].map(level => {
+                const r = (level / 5) * R;
+                const pts = Array.from({length: N}, (_, i) => `${pt(i, r).x},${pt(i, r).y}`).join(' ');
+                return <polygon key={level} points={pts} fill="none" stroke={level === 5 ? '#e5e7eb' : '#f3f4f6'} strokeWidth="1" />;
+              })}
+              {/* Axis lines */}
+              {Array.from({length: N}, (_, i) => {
+                const p = pt(i, R);
+                return <line key={i} x1={CX} y1={CY} x2={p.x} y2={p.y} stroke="#e5e7eb" strokeWidth="1" />;
+              })}
+              {/* Axis labels */}
+              {Array.from({length: N}, (_, i) => {
+                const p = pt(i, R + 14);
+                const xOff = Math.abs(p.x - CX) < 8 ? 'middle' : p.x < CX ? 'end' : 'start';
+                return (
+                  <text key={i} x={p.x} y={p.y} textAnchor={xOff} dominantBaseline="middle"
+                    fill="#6b7280" fontSize="9" fontWeight="500">
+                    {AXES[i]}
+                  </text>
+                );
+              })}
+              {/* Competitor polygons */}
+              {scores.map((score, ci) => {
+                const pts = score.map((s, i) => { const p = pt(i, (s / 5) * R); return `${p.x},${p.y}`; }).join(' ');
+                const color = COLORS[ci % COLORS.length];
+                return (
+                  <polygon key={ci} points={pts}
+                    fill={color} fillOpacity="0.12"
+                    stroke={color} strokeWidth="2" strokeOpacity="0.85"
+                  />
+                );
+              })}
+            </svg>
+          </div>
+          {/* Legend */}
+          <div className="flex flex-wrap gap-3 justify-center mt-2">
+            {list.filter(c => c.naam).map((c, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                <span className="text-xs text-gray-600">{c.naam}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 text-center mt-1.5 italic">Scores op basis van sleutelwoorden in tekstvelden (1–5). Engagement berekend via likes + comments / volgers.</p>
         </div>
       );
     }
@@ -1161,7 +1599,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
             <IconDataCard icon="📖" label="Geschiedenis van het merk" value={data.geschiedenis} />
           </div>
           <DCard title="Team structuur">
-            <OrgChart team={data.team} rollen={data.rollenManagement} werking={data.werking} />
+            <OrgChart teamleden={data.teamleden} team={data.team} rollen={data.rollenManagement} werking={data.werking} />
           </DCard>
         </div>
       );
@@ -1171,10 +1609,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       return (
         <div className="fade-in space-y-3">
           <PageInsights insights={insights} />
+          {(() => { const { positive: sPos, total: sTot } = computeSectionHealth([data.visuelIdentiteit, data.toneOfVoice, data.consistentieBranding, data.waardenMissie, data.huidigePositionering]); return (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">B</span>
             <h4 className="text-sm font-semibold text-gray-800">Merkidentiteit</h4>
+            <SectionHealthBadge positive={sPos} total={sTot} />
           </div>
+          ); })()}
           <div className="bg-violet-50 rounded-2xl p-3 space-y-2">
             <IconDataCard icon="🎨" label="Visuele identiteit (logo, kleuren, stijl)" value={data.visuelIdentiteit} />
             <IconDataCard icon="🗣️" label="Tone of voice" value={data.toneOfVoice} />
@@ -1190,10 +1631,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       return (
         <div className="fade-in space-y-3">
           <PageInsights insights={insights} />
+          {(() => { const { positive: sPos, total: sTot } = computeSectionHealth([data.actievePlatformen, data.onderbouwingPerPlatform, data.primairKanaal, data.ontbrekendeKanalen]); return (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">C</span>
             <h4 className="text-sm font-semibold text-gray-800">Kanaalstrategie</h4>
+            <SectionHealthBadge positive={sPos} total={sTot} />
           </div>
+          ); })()}
           <div className="bg-blue-50 rounded-2xl p-3 space-y-2">
             <IconDataCard icon="📱" label="Actieve platformen" value={data.actievePlatformen} asTags />
             <IconDataCard icon="📝" label="Strategische onderbouwing per platform" value={data.onderbouwingPerPlatform} />
@@ -1208,10 +1652,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       return (
         <div className="fade-in space-y-4">
           <PageInsights insights={insights} />
+          {(() => { const { positive: sPos, total: sTot } = computeSectionHealth([data.wieVolgt, data.leeftijdInteresses, data.gedrag, data.engagement, data.communityInteractie]); return (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">D</span>
             <h4 className="text-sm font-semibold text-gray-800">Doelgroep (huidige)</h4>
+            <SectionHealthBadge positive={sPos} total={sTot} />
           </div>
+          ); })()}
           <div className="bg-amber-50 rounded-2xl p-3 space-y-2">
             <IconDataCard icon="👁️" label="Wie volgt het merk nu?" value={data.wieVolgt} />
             <IconDataCard icon="🎯" label="Leeftijd / interesses" value={data.leeftijdInteresses} />
@@ -1317,10 +1764,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       return (
         <div className="fade-in space-y-3">
           <PageInsights insights={insights} />
+          {(() => { const { positive: sPos, total: sTot } = computeSectionHealth([data.positioneringsconsistentie, data.toneOfVoice, data.storytelling, data.emotie, data.doelgroepresonantie, data.formatstrategie]); return (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">G</span>
             <h4 className="text-sm font-semibold text-gray-800">Strategische contentanalyse</h4>
+            <SectionHealthBadge positive={sPos} total={sTot} />
           </div>
+          ); })()}
           <div className="bg-teal-50 rounded-2xl p-3 space-y-2">
             {items.map((item, i) => (
               <IconDataCard key={i} icon={item.icon} label={item.label} value={item.value} />
@@ -1331,34 +1781,59 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     function CommunityMeter({ data }) {
+      // Arc gauge replaces linear bar — visualization-expert: arc/gauge communicates
+      // "position on a bounded scale" more intuitively than a bar for KPI health scores.
+      // Zone boundaries at 40% and 70% are shown as tick marks on the arc.
       const pct = computeCommunityScore(data);
       const label = pct < 25 ? 'Publiek' : pct < 50 ? 'Emerging community' : pct < 75 ? 'Actieve community' : 'Echte community';
       const color = pct < 40 ? '#ef4444' : pct <= 70 ? '#f59e0b' : '#10b981';
 
+      // SVG arc geometry: semi-circle from left (180°) to right (0°) over the top.
+      // Point at angle d°: x = cx + R·cos(d°), y = cy − R·sin(d°)  (−sin because SVG y goes down).
+      // sweep-flag=0 (CCW in SVG screen coords) draws the upper semi-circle.
+      const R = 50, cx = 80, cy = 78;
+      const toRad = d => d * Math.PI / 180;
+      const px = d => +(cx + R * Math.cos(toRad(d))).toFixed(2);
+      const py = d => +(cy - R * Math.sin(toRad(d))).toFixed(2);
+      const lx = px(180), ly = py(180);   // left start (180°)
+      const rx = px(0),   ry = py(0);     // right end (0°)
+      const fa = 180 - (pct / 100) * 180; // fill angle
+      const fx = px(fa),  fy = py(fa);    // fill endpoint
+
+      // Tick marks at zone boundaries: 40% → angle 108°, 70% → angle 54°
+      const tk = (d, r) => ({ x: +(cx + r * Math.cos(toRad(d))).toFixed(2), y: +(cy - r * Math.sin(toRad(d))).toFixed(2) });
+      const t40i = tk(108, R-6), t40o = tk(108, R+6);
+      const t70i = tk(54,  R-6), t70o = tk(54,  R+6);
+
       return (
         <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
-          <div className="flex items-center gap-1 mb-4">
+          <div className="flex items-center gap-1 mb-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Community score</p>
             <Tooltip text="Onder 40% = publiek, 40–70% = actieve community, boven 70% = echte community — score gebaseerd op interactie in comments, terugkerende fans, UGC en betrokkenheid." />
           </div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-gray-400">Publiek</span>
-            <span className="text-xs font-bold" style={{ color }}>{label}</span>
-            <span className="text-xs text-gray-400">Echte community</span>
+          <div className="flex justify-center">
+            <svg width="160" height="96" viewBox="0 0 160 96">
+              {/* Background track: full upper semi-circle */}
+              <path d={`M ${lx} ${ly} A ${R} ${R} 0 0 0 ${rx} ${ry}`}
+                fill="none" stroke="#f3f4f6" strokeWidth="14" strokeLinecap="butt" />
+              {/* Filled arc to current score value */}
+              {pct > 0 && (
+                <path d={`M ${lx} ${ly} A ${R} ${R} 0 0 0 ${fx} ${fy}`}
+                  fill="none" stroke={color} strokeWidth="14" strokeLinecap="round" />
+              )}
+              {/* Zone boundary ticks at 40% and 70% */}
+              <line x1={t40i.x} y1={t40i.y} x2={t40o.x} y2={t40o.y} stroke="#e5e7eb" strokeWidth="2" />
+              <line x1={t70i.x} y1={t70i.y} x2={t70o.x} y2={t70o.y} stroke="#e5e7eb" strokeWidth="2" />
+              {/* Score text centered inside the gauge */}
+              <text x={cx} y={cy - 5} textAnchor="middle" fill="#111827" fontSize="24" fontWeight="800">{pct}%</text>
+              <text x={cx} y={cy + 9} textAnchor="middle" fill={color} fontSize="8.5" fontWeight="700" letterSpacing="0.5">{label.toUpperCase()}</text>
+              {/* Edge labels */}
+              <text x={lx + 3} y={ly + 13} textAnchor="start" fill="#d1d5db" fontSize="7">0</text>
+              <text x={rx - 3} y={ry + 13} textAnchor="end" fill="#d1d5db" fontSize="7">100</text>
+            </svg>
           </div>
-          <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="absolute inset-y-0 left-0 rounded-full transition-all duration-700"
-              style={{ width: `${pct}%`, backgroundColor: color }}
-            />
-          </div>
-          <div className="flex justify-between mt-1">
-            <span className="text-xs text-gray-300">0</span>
-            <span className="text-xs font-semibold text-gray-600">{pct}%</span>
-            <span className="text-xs text-gray-300">100</span>
-          </div>
-          <p className="text-xs text-gray-400 mt-3 italic">
-            Score gebaseerd op: interactie in comments, terugkerende fans, user generated content en community betrokkenheid.
+          <p className="text-xs text-gray-400 mt-1 italic text-center">
+            Interactie · Terugkerende fans · UGC · Betrokkenheid
           </p>
         </div>
       );
@@ -1368,10 +1843,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       return (
         <div className="fade-in space-y-4">
           <PageInsights insights={insights} />
+          {(() => { const { positive: sPos, total: sTot } = computeSectionHealth([data.interactieComments, data.terugkerendeFans, data.userGeneratedContent, data.communityBetrokkenheid, data.publiefOfCommunity]); return (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">H</span>
             <h4 className="text-sm font-semibold text-gray-800">Community analyse</h4>
+            <SectionHealthBadge positive={sPos} total={sTot} />
           </div>
+          ); })()}
           <div className="bg-emerald-50 rounded-2xl p-3 space-y-2">
             <IconDataCard icon="💬" label="Interactie in comments" value={data.interactieComments} />
             <IconDataCard icon="📩" label="DM interacties" value={data.dmInteracties} />
@@ -1529,25 +2007,60 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     function PageConcurrentie({ data }) {
+      // visualization-expert: mixed text+bar tables make numeric comparisons instantly scannable.
+      // Inline bars added for Posts/week, Stories/week and ER rows — these are the only rows
+      // with quantitative values suitable for length encoding. Text rows stay as text.
       const list = Array.isArray(data) ? data : [data];
+
+      // Numeric getters for bar-chart rows
+      const getPostsVal   = c => { const n = Number(c.postsAantal);   return n > 0 ? +(n / 4).toFixed(1) : 0; };
+      const getStoriesVal = c => { const n = Number(c.storiesAantal); return n > 0 ? +(n / 4).toFixed(1) : 0; };
+      const getErVal      = c => parseEngagementRate(getCompetitorEngagementRate(c)) || 0;
+
+      // Max values across all competitors — used to normalise bar widths
+      const maxPosts   = Math.max(...list.map(getPostsVal),   0.01);
+      const maxStories = Math.max(...list.map(getStoriesVal), 0.01);
+      const maxEr      = Math.max(...list.map(getErVal),      0.01);
+
       const rows = [
         { key: 'positionering', label: 'Positionering' },
         { key: 'branding',      label: 'Branding' },
         { key: 'content',       label: 'Content' },
         { key: 'community',     label: 'Community' },
-        { key: null, label: 'Posts/week', render: c => { const n = Number(c.postsAantal); return n > 0 ? `≈ ${(n / 4).toFixed(1).replace('.0','')} per week (${n} in 4 weken)` : ''; } },
-        { key: null, label: 'Stories/week', render: c => { const n = Number(c.storiesAantal); return n > 0 ? `≈ ${(n / 4).toFixed(1).replace('.0','')} per week (${n} in 4 weken)` : ''; } },
-        { key: null, label: 'Engagement (ER)', render: c => getCompetitorEngagementRate(c) },
+        {
+          key: null, label: 'Posts/week',
+          render: c => { const n = Number(c.postsAantal); return n > 0 ? `≈ ${(n / 4).toFixed(1).replace('.0','')}` : ''; },
+          getVal: getPostsVal, maxVal: maxPosts, barColor: c => CONTENTMIX_COLORS[list.indexOf(c) % CONTENTMIX_COLORS.length],
+        },
+        {
+          key: null, label: 'Stories/week',
+          render: c => { const n = Number(c.storiesAantal); return n > 0 ? `≈ ${(n / 4).toFixed(1).replace('.0','')}` : ''; },
+          getVal: getStoriesVal, maxVal: maxStories, barColor: c => CONTENTMIX_COLORS[list.indexOf(c) % CONTENTMIX_COLORS.length],
+        },
+        {
+          key: null, label: 'Engagement (ER)',
+          render: c => getCompetitorEngagementRate(c),
+          getVal: getErVal, maxVal: maxEr,
+          // ER bar color follows benchmark thresholds (red/amber/green)
+          barColor: c => { const v = getErVal(c); return v >= 5 ? '#10b981' : v >= 2 ? '#f59e0b' : '#ef4444'; },
+        },
         { key: 'differentiatie',label: 'Differentiatie' },
         { key: 'watDoenZijNiet',label: 'Wat doen zij NIET?' },
       ];
       const colW = Math.max(180, Math.floor(280 / list.length));
+      const { positive: cPos, total: cTot } = computeSectionHealth(list.flatMap(c => [c.positionering, c.branding, c.content, c.community, c.differentiatie]));
       return (
         <div className="fade-in">
           <div className="flex items-baseline gap-2 mb-3">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">A</span>
             <h4 className="text-sm font-semibold text-gray-800">Concurrentieanalyse</h4>
+            <SectionHealthBadge positive={cPos} total={cTot} />
           </div>
+          {list.length > 0 && list[0].naam && (
+            <DCard title="Vergelijkingsdiagram">
+              <ConcurrentieRadar data={list} />
+            </DCard>
+          )}
           <div className="overflow-x-auto -mx-4 px-4">
             <table className="w-full border-collapse" style={{ minWidth: `${140 + list.length * colW}px` }}>
               <thead>
@@ -1565,16 +2078,25 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               </thead>
               <tbody>
                 {rows.map((row, ri) => (
-                  <tr key={row.key} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <tr key={ri} className={ri % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="text-xs font-semibold text-gray-500 py-3 pr-3 align-top sticky left-0 z-10 border-r border-gray-100" style={{ backgroundColor: 'inherit' }}>
                       {row.label}
                     </td>
                     {list.map((c, i) => {
                       const val = row.render ? row.render(c) : c[row.key];
+                      const numVal = row.getVal ? row.getVal(c) : null;
+                      const barPct = numVal !== null && row.maxVal > 0 ? (numVal / row.maxVal) * 100 : 0;
+                      const bColor = row.barColor ? row.barColor(c) : null;
                       return (
-                        <td key={i} className="text-xs text-gray-700 py-3 px-3 align-top border-l border-gray-100 leading-relaxed whitespace-pre-wrap">
-                          {val || <span className="text-gray-300 italic">—</span>}
-                          {row.render && val && <span className="block text-gray-400 italic mt-0.5">Berekend op basis van publieke data.</span>}
+                        <td key={i} className="text-xs text-gray-700 py-3 px-3 align-top border-l border-gray-100 leading-relaxed">
+                          <span>{val || <span className="text-gray-300 italic">—</span>}</span>
+                          {/* Inline comparison bar for numeric rows — length encoding for comparison */}
+                          {numVal !== null && numVal > 0 && (
+                            <div className="mt-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden w-full">
+                              <div className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${barPct}%`, backgroundColor: bColor }} />
+                            </div>
+                          )}
                         </td>
                       );
                     })}
@@ -1590,10 +2112,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageSamenwerkingen({ data }) {
       return (
         <div className="fade-in space-y-3">
+          {(() => { const { positive: sPos, total: sTot } = computeSectionHealth([data.potentielePartners, data.gatekeepers, data.bestaandeSamenwerkingen, data.ontbrekendeSamenwerkingen]); return (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">B</span>
             <h4 className="text-sm font-semibold text-gray-800">Samenwerkingen en netwerk</h4>
+            <SectionHealthBadge positive={sPos} total={sTot} />
           </div>
+          ); })()}
           <div className="bg-purple-50 rounded-2xl p-3 space-y-2">
             <IconDataCard icon="🤝" label="Potentiële partners" value={data.potentielePartners} asTags />
             <IconDataCard icon="🔑" label="Gatekeepers in de scene" value={data.gatekeepers} asTags />
@@ -1607,10 +2132,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageMarkt({ data }) {
       return (
         <div className="fade-in space-y-3">
+          {(() => { const { positive: sPos, total: sTot } = computeSectionHealth([data.grootteScene, data.populariteitGenre, data.aantalEvents, data.andereLabels, data.marktverzadiging]); return (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">C</span>
             <h4 className="text-sm font-semibold text-gray-800">Markt / scene analyse</h4>
+            <SectionHealthBadge positive={sPos} total={sTot} />
           </div>
+          ); })()}
           <div className="bg-orange-50 rounded-2xl p-3 space-y-2">
             <IconDataCard icon="📊" label="Grootte van de scene" value={data.grootteScene} />
             <IconDataCard icon="🎵" label="Populariteit van het genre" value={data.populariteitGenre} />
@@ -1625,10 +2153,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     function PageDoelgroepgedrag({ data }) {
       return (
         <div className="fade-in space-y-3">
+          {(() => { const { positive: sPos, total: sTot } = computeSectionHealth([data.ontdekkingMuziek, data.platformgebruik, data.motivatie, data.invloeden]); return (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">D</span>
             <h4 className="text-sm font-semibold text-gray-800">Doelgroepgedrag</h4>
+            <SectionHealthBadge positive={sPos} total={sTot} />
           </div>
+          ); })()}
           <div className="bg-sky-50 rounded-2xl p-3 space-y-2">
             <IconDataCard icon="🔍" label="Hoe ontdekken ze muziek?" value={data.ontdekkingMuziek} />
             <IconDataCard icon="📱" label="Welke platformen gebruiken ze?" value={data.platformgebruik} />
@@ -1655,10 +2186,13 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       ];
       return (
         <div className="fade-in space-y-3">
+          {(() => { const { positive: sPos, total: sTot } = computeSectionHealth([data.genrePopulariteit, data.nostalgieTrends, data.diyCultuur, data.authenticiteitVsCommercialisering]); return (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">E</span>
             <h4 className="text-sm font-semibold text-gray-800">Culturele trends</h4>
+            <SectionHealthBadge positive={sPos} total={sTot} />
           </div>
+          ); })()}
           <div className="bg-rose-50 rounded-2xl p-3 space-y-2">
             {trends.map((trend, i) => {
               const dir = trendDir(trend.value);
@@ -1706,6 +2240,36 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         : ca.insightsAccess === 'nee'
           ? 'Indicatieve score — publieke data (volgers).'
           : null;
+
+      // Best competitor ER for benchmark
+      const competitorErs = (Array.isArray(ext.concurrentieanalyse) ? ext.concurrentieanalyse : [])
+        .map(c => parseEngagementRate(getCompetitorEngagementRate(c)))
+        .filter(n => n !== null);
+      const bestCompetitorEr = competitorErs.length > 0 ? Math.max(...competitorErs) : null;
+
+      // Marktcontext badges
+      const marktGrootteStr = (ext.marktSceneAnalyse?.grootteScene || '').trim();
+      const marktverzadigingStr = (ext.marktSceneAnalyse?.marktverzadiging || '').toLowerCase().trim();
+      const marktBadge = (text) => {
+        if (!text) return null;
+        const t = text.toLowerCase();
+        if (/groei|stijg|opkomst|expand/.test(t)) return { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200', label: 'Groeiend' };
+        if (/krimp|dalend|daalt|afneem|achteruit/.test(t)) return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', label: 'Krimpend' };
+        if (/verzadigd|overbevolkt/.test(t)) return { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-200', label: 'Verzadigd' };
+        return { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', label: 'Stabiel' };
+      };
+      const grootteB = marktBadge(marktGrootteStr);
+      const verzadigingB = marktBadge(marktverzadigingStr);
+
+      // Middelen parsing
+      const budgetStr = (int.middelen?.budget || '').trim();
+      const tijdStr = (int.middelen?.tijd || '').trim();
+      const parseBudgetNum = (s) => { const m = String(s).replace(/\./g,'').match(/[\d]+/); return m ? parseInt(m[0]) : null; };
+      const parseTijdNum = (s) => { const m = String(s).match(/([\d,.]+)\s*(?:uur|u\b)/i); return m ? parseFloat(m[1].replace(',','.')) : null; };
+      const budgetNum = parseBudgetNum(budgetStr);
+      const tijdNum = parseTijdNum(tijdStr);
+      const budgetWarn = budgetNum !== null && budgetNum < 500;
+      const tijdWarn = tijdNum !== null && tijdNum < 5;
 
       // Contentmix
       const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
@@ -1825,6 +2389,14 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
               }
               {!erMissing && erC.label && <p className={`text-xs font-semibold mt-1 ${erC.text}`}>{erC.label}</p>}
               {!erMissing && erNote && <p className="text-xs text-gray-400 mt-1 italic">{erNote}</p>}
+              {!erMissing && bestCompetitorEr !== null && (
+                <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-200 border-opacity-40">
+                  <span className={`font-bold text-base leading-none ${erNum >= bestCompetitorEr ? 'text-emerald-500' : 'text-amber-500'}`}>
+                    {erNum >= bestCompetitorEr ? '↑' : '↓'}
+                  </span>
+                  <p className="text-xs text-gray-500">Beste concurrent: <span className="font-semibold text-gray-700">{bestCompetitorEr.toFixed(2)}%</span></p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1863,6 +2435,50 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                   <p className="text-xs text-orange-600 mt-1.5 ml-6 leading-relaxed">Er is een kloof gedetecteerd tussen wie je wil bereiken en wie je nu bereikt. Dit beïnvloedt je contentstrategie en communicatie.</p>
                 </div>
               )}
+            </DCard>
+          )}
+
+          {/* ── Marktcontext ── */}
+          {(marktGrootteStr || marktverzadigingStr) && (
+            <DCard title="Marktcontext">
+              <div className="flex gap-2 flex-wrap">
+                {marktGrootteStr && grootteB && (
+                  <div className={`flex-1 min-w-0 rounded-xl p-3 border ${grootteB.bg} ${grootteB.border}`}>
+                    <p className="text-xs text-gray-500 mb-1">📊 Marktgrootte</p>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${grootteB.bg} ${grootteB.text} border ${grootteB.border}`}>{grootteB.label}</span>
+                    <p className="text-xs text-gray-600 mt-1.5 leading-relaxed line-clamp-2">{marktGrootteStr}</p>
+                  </div>
+                )}
+                {marktverzadigingStr && verzadigingB && (
+                  <div className={`flex-1 min-w-0 rounded-xl p-3 border ${verzadigingB.bg} ${verzadigingB.border}`}>
+                    <p className="text-xs text-gray-500 mb-1">⚖️ Verzadiging</p>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${verzadigingB.bg} ${verzadigingB.text} border ${verzadigingB.border}`}>{verzadigingB.label}</span>
+                    <p className="text-xs text-gray-600 mt-1.5 leading-relaxed line-clamp-2">{marktverzadigingStr}</p>
+                  </div>
+                )}
+              </div>
+            </DCard>
+          )}
+
+          {/* ── Middelen ── */}
+          {(budgetStr || tijdStr) && (
+            <DCard title="Middelen">
+              <div className="grid grid-cols-2 gap-3">
+                {budgetStr && (
+                  <div className={`rounded-xl p-3 border ${budgetWarn ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                    <p className="text-xs text-gray-500 mb-1">💰 Budget</p>
+                    <p className={`text-sm font-semibold ${budgetWarn ? 'text-amber-700' : 'text-emerald-700'} leading-snug`}>{budgetStr}</p>
+                    {budgetWarn && <p className="text-xs text-amber-600 mt-1">Onder €500/maand</p>}
+                  </div>
+                )}
+                {tijdStr && (
+                  <div className={`rounded-xl p-3 border ${tijdWarn ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                    <p className="text-xs text-gray-500 mb-1">⏱ Tijd</p>
+                    <p className={`text-sm font-semibold ${tijdWarn ? 'text-amber-700' : 'text-emerald-700'} leading-snug`}>{tijdStr}</p>
+                    {tijdWarn && <p className="text-xs text-amber-600 mt-1">Onder 5 uur/week</p>}
+                  </div>
+                )}
+              </div>
             </DCard>
           )}
 
@@ -1961,24 +2577,34 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       }
 
       function TabJourney() {
+        // Vertical timeline with connector line — visualization-expert: sequential process data
+        // is best shown as a flow/timeline. The connector line communicates progression and
+        // makes the sequential relationship between steps immediately visible.
         if (!persona.journey || !persona.journey.length) return <PersonaTabEmpty />;
+        const bgMap    = { violet: 'bg-violet-50 border-violet-200', blue: 'bg-blue-50 border-blue-200', emerald: 'bg-emerald-50 border-emerald-200', amber: 'bg-amber-50 border-amber-200', rose: 'bg-rose-50 border-rose-200', gray: 'bg-gray-50 border-gray-200' };
+        const badgeMap = { violet: 'bg-violet-500 text-white', blue: 'bg-blue-500 text-white', emerald: 'bg-emerald-500 text-white', amber: 'bg-amber-500 text-white', rose: 'bg-rose-500 text-white', gray: 'bg-gray-400 text-white' };
         return (
-          <div className="space-y-3">
-            {persona.journey.map((fase, i) => {
-              const color = JOURNEY_COLORS[i] || 'gray';
-              const bgMap = { violet: 'bg-violet-50 border-violet-200', blue: 'bg-blue-50 border-blue-200', emerald: 'bg-emerald-50 border-emerald-200', amber: 'bg-amber-50 border-amber-200', rose: 'bg-rose-50 border-rose-200', gray: 'bg-gray-50 border-gray-200' };
-              const badgeMap = { violet: 'bg-violet-100 text-violet-700', blue: 'bg-blue-100 text-blue-700', emerald: 'bg-emerald-100 text-emerald-700', amber: 'bg-amber-100 text-amber-700', rose: 'bg-rose-100 text-rose-700', gray: 'bg-gray-100 text-gray-700' };
-              return (
-                <div key={i} className={`border rounded-xl p-3 ${bgMap[color]}`}>
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${badgeMap[color]}`}>{i + 1}</span>
-                    <p className="text-xs font-bold text-gray-800">{fase.fase}</p>
+          <div className="relative">
+            {/* Vertical connector line linking all steps — communicates sequential flow */}
+            <div className="absolute left-3.5 top-4 bottom-4 w-px bg-gray-200" />
+            <div className="space-y-3">
+              {persona.journey.map((fase, i) => {
+                const color = JOURNEY_COLORS[i] || 'gray';
+                return (
+                  <div key={i} className="flex gap-3 relative">
+                    {/* Step badge sits on the timeline line */}
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 z-10 ${badgeMap[color]}`}>
+                      {i + 1}
+                    </div>
+                    <div className={`flex-1 border rounded-xl p-3 ${bgMap[color]}`}>
+                      <p className="text-xs font-bold text-gray-800 mb-1">{fase.fase}</p>
+                      {fase.beschrijving && <p className="text-xs text-gray-700 leading-relaxed mb-1">{fase.beschrijving}</p>}
+                      {fase.voorbeeld && <p className="text-xs text-gray-500 italic leading-relaxed">Voorbeeld: {fase.voorbeeld}</p>}
+                    </div>
                   </div>
-                  {fase.beschrijving && <p className="text-xs text-gray-700 leading-relaxed mb-1">{fase.beschrijving}</p>}
-                  {fase.voorbeeld && <p className="text-xs text-gray-500 italic leading-relaxed">Voorbeeld: {fase.voorbeeld}</p>}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         );
       }
@@ -2326,6 +2952,137 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       onChange: PropTypes.func.isRequired,
     };
 
+    // ─── Export modal ──────────────────────────────────────────────────────────
+    const INTERN_EXPORT_SECTIONS = [
+      { id: 'organisatie',    label: 'Organisatie' },
+      { id: 'merkidentiteit', label: 'Merkidentiteit' },
+      { id: 'kanalen',        label: 'Kanalen' },
+      { id: 'doelgroep',      label: 'Doelgroep' },
+      { id: 'content',        label: 'Content' },
+      { id: 'strategie',      label: 'Strategie' },
+      { id: 'community',      label: 'Community' },
+      { id: 'middelen',       label: 'Middelen' },
+      { id: 'swot',           label: 'SWOT' },
+    ];
+    const EXTERN_EXPORT_SECTIONS = [
+      { id: 'concurrentie',    label: 'Concurrentie' },
+      { id: 'samenwerkingen',  label: 'Samenwerkingen' },
+      { id: 'markt',           label: 'Markt/Scene' },
+      { id: 'doelgroepgedrag', label: 'Doelgroepgedrag' },
+      { id: 'trends',          label: 'Trends' },
+    ];
+    const ALL_EXPORT_IDS = ['samenvatting','personas',...INTERN_EXPORT_SECTIONS.map(s=>s.id),...EXTERN_EXPORT_SECTIONS.map(s=>s.id)];
+
+    function ExportModal({ analysis, onClose }) {
+      const [selected, setSelected] = useState(() => new Set(ALL_EXPORT_IDS));
+      const [format, setFormat]     = useState('pdf');
+      const [expanded, setExpanded] = useState(false);
+      const internIds = INTERN_EXPORT_SECTIONS.map(s => s.id);
+      const externIds = EXTERN_EXPORT_SECTIONS.map(s => s.id);
+      const allSelected    = ALL_EXPORT_IDS.every(id => selected.has(id));
+      const internSelected = internIds.every(id => selected.has(id));
+      const externSelected = externIds.every(id => selected.has(id));
+
+      const toggle = (id) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+      const toggleAll = () => setSelected(allSelected ? new Set() : new Set(ALL_EXPORT_IDS));
+      const toggleGroup = (ids) => {
+        const allIn = ids.every(id => selected.has(id));
+        setSelected(prev => { const n = new Set(prev); ids.forEach(id => allIn ? n.delete(id) : n.add(id)); return n; });
+      };
+      const handleExport = () => {
+        if (!selected.size) return;
+        if (format === 'pdf') exportPDFFiltered(analysis, selected);
+        else exportJSONFiltered(analysis, selected);
+        onClose();
+      };
+
+      const CheckRow = ({ id, label, bold = false, groupIds = null }) => {
+        const checked = groupIds ? groupIds.every(i => selected.has(i)) : selected.has(id);
+        const onChange = groupIds ? () => toggleGroup(groupIds) : () => toggle(id);
+        return (
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <input type="checkbox" checked={checked} onChange={onChange}
+              className="w-4 h-4 rounded accent-gray-900 shrink-0" />
+            <span className={`text-sm ${bold ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{label}</span>
+          </label>
+        );
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] flex flex-col fade-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 shrink-0">
+              <h2 className="text-sm font-bold text-gray-900">Kies wat je wil exporteren</h2>
+              <button onClick={onClose} aria-label="Sluiten" className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              <CheckRow id="all" label="Volledige analyse" bold groupIds={ALL_EXPORT_IDS} />
+              <div className="border-t border-gray-100 pt-3 space-y-2.5">
+                <CheckRow id="samenvatting"      label="Samenvatting" />
+                <CheckRow id="interne_volledig"  label="Interne Analyse (volledig)"  groupIds={internIds} />
+                <CheckRow id="externe_volledig"  label="Externe Analyse (volledig)"  groupIds={externIds} />
+                <CheckRow id="personas"          label="Persona's" />
+              </div>
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setExpanded(e => !e)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide hover:bg-gray-50 transition-colors"
+                >
+                  <span>Individuele secties</span>
+                  <span className="text-gray-400">{expanded ? '▲' : '▼'}</span>
+                </button>
+                {expanded && (
+                  <div className="border-t border-gray-100 px-4 py-3 space-y-4 bg-gray-50/80">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Intern</p>
+                      <div className="space-y-2">
+                        {INTERN_EXPORT_SECTIONS.map(s => (
+                          <label key={s.id} className="flex items-center gap-2.5 cursor-pointer select-none pl-1">
+                            <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)}
+                              className="w-3.5 h-3.5 rounded accent-gray-900 shrink-0" />
+                            <span className="text-sm text-gray-600">{s.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Extern</p>
+                      <div className="space-y-2">
+                        {EXTERN_EXPORT_SECTIONS.map(s => (
+                          <label key={s.id} className="flex items-center gap-2.5 cursor-pointer select-none pl-1">
+                            <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)}
+                              className="w-3.5 h-3.5 rounded accent-gray-900 shrink-0" />
+                            <span className="text-sm text-gray-600">{s.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Formaat</p>
+                <div className="flex gap-2">
+                  {[['pdf','PDF'],['json','JSON']].map(([f,label]) => (
+                    <button key={f} onClick={() => setFormat(f)}
+                      className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${format === f ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100 shrink-0">
+              <button onClick={handleExport} disabled={!selected.size}
+                className="w-full bg-gray-900 text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                Exporteer
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     DashboardScreen.propTypes = {
       analysis: PropTypes.object.isRequired,
       onBack: PropTypes.func.isRequired,
@@ -2336,17 +3093,9 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       const [mainTab, setMainTab] = useState('samenvatting');
       const [interneTab, setInterneTab] = useState('organisatie');
       const [externeTab, setExterneTab] = useState('concurrentie');
-      const [showExportMenu, setShowExportMenu] = useState(false);
-      const exportMenuRef = useRef();
+      const [showExportModal, setShowExportModal] = useState(false);
       const { interneAnalyse: int, externeAnalyse: ext } = analysis;
       const insights = useMemo(() => detectInsights(analysis), [analysis]);
-
-      useEffect(() => {
-        if (!showExportMenu) return;
-        const handler = (e) => { if (!exportMenuRef.current?.contains(e.target)) setShowExportMenu(false); };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-      }, [showExportMenu]);
 
       const handleMainTab = (tab) => {
         setMainTab(tab);
@@ -2398,37 +3147,19 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
                   <p className="text-xs text-gray-400">{formatDate(analysis.datum)}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* Split export button */}
-                  <div ref={exportMenuRef} className="relative">
-                    <div className="flex items-center border border-gray-200 bg-white rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => exportPDF(analysis)}
-                        className="inline-flex items-center gap-1.5 text-xs text-gray-500 px-3 py-1.5 hover:bg-gray-50 transition-colors border-r border-gray-200"
-                      >
-                        <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round"/>
-                          <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round"/>
-                          <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round"/>
-                        </svg>
-                        PDF
-                      </button>
-                      <button
-                        onClick={() => setShowExportMenu(m => !m)}
-                        className="text-gray-400 px-2 py-1.5 hover:bg-gray-50 transition-colors text-xs"
-                        aria-label="Meer exportopties"
-                      >▾</button>
-                    </div>
-                    {showExportMenu && (
-                      <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-max">
-                        <button
-                          onClick={() => { exportAnalysis(analysis); setShowExportMenu(false); }}
-                          className="w-full text-left text-xs text-gray-600 px-4 py-2 hover:bg-gray-50 transition-colors"
-                        >
-                          JSON exporteren
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  {/* Export button */}
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    className="inline-flex items-center gap-1.5 text-xs text-gray-500 px-3 py-1.5 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round"/>
+                      <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round"/>
+                      <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round"/>
+                    </svg>
+                    Exporteer
+                  </button>
+                  {showExportModal && <ExportModal analysis={analysis} onClose={() => setShowExportModal(false)} />}
                   <button
                     onClick={onEdit}
                     className="inline-flex items-center gap-1.5 text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg hover:bg-gray-700 transition-colors"
@@ -2486,30 +3217,21 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     }
 
     // ─── Progress bar ─────────────────────────────────────────────────────────
-    function ProgressBar({ step, total }) {
-      const labels = ['Interne Analyse', 'Externe Analyse', 'Opslaan'];
-      const pct = ((step - 1) / (total - 1)) * 100;
+    function WizardProgressBar({ step, total, title, completions }) {
       return (
-        <div className="mb-8">
-          <div className="flex justify-between mb-3">
-            {labels.map((label, i) => {
-              const done = i < step - 1;
-              const active = i === step - 1;
-              return (
-                <div key={i} className="flex flex-col items-center gap-1" style={{ flex: 1 }}>
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors
-                    ${done ? 'bg-gray-800 text-white' : active ? 'bg-gray-900 text-white ring-2 ring-gray-300' : 'bg-gray-100 text-gray-400'}`}>
-                    {done ? '✓' : i + 1}
-                  </div>
-                  <span className={`text-xs text-center leading-tight ${active ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
-                    {label}
-                  </span>
-                </div>
-              );
-            })}
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-gray-400">Stap {step} van {total}</span>
+            <span className="text-sm font-semibold text-gray-800">{title}</span>
           </div>
-          <div className="h-1 bg-gray-100 rounded-full">
-            <div className="h-1 bg-gray-800 rounded-full transition-all duration-400" style={{ width: `${pct}%` }} />
+          <div className="flex gap-1">
+            {completions.map((done, i) => (
+              <div key={i} className={`h-1.5 rounded-full flex-1 transition-all ${
+                i < step - 1
+                  ? (done ? 'bg-green-400' : 'bg-gray-300')
+                  : i === step - 1 ? 'bg-gray-900' : 'bg-gray-100'
+              }`} />
+            ))}
           </div>
         </div>
       );
@@ -2562,403 +3284,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
       );
     }
 
-    // ─── Step 1: Interne Analyse form ─────────────────────────────────────────
-    InterneAnalyseForm.propTypes = {
-      data: PropTypes.object.isRequired,
-      onChange: PropTypes.func.isRequired,
-    };
-
-    function InterneAnalyseForm({ data, onChange }) {
-      const s = (section, key, val) => onChange({ ...data, [section]: { ...data[section], [key]: val } });
-      return (
-        <div className="fade-in">
-          <SubSection letter="A" title="Organisatie / structuur" subtitle="Bepaalt middelen en mogelijkheden.">
-            <Field label="Wat voor label / bedrijf is het?" value={data.organisatie.labelType} onChange={v => s('organisatie','labelType',v)} rows={2} />
-            <Field label="Geschiedenis van het merk" value={data.organisatie.geschiedenis} onChange={v => s('organisatie','geschiedenis',v)} rows={4} />
-            <Field label="Team / leden" value={data.organisatie.team} onChange={v => s('organisatie','team',v)} rows={2} />
-            <Field label="Rollen en managementstructuur" value={data.organisatie.rollenManagement} onChange={v => s('organisatie','rollenManagement',v)} rows={2} />
-            <Field label="Werking (hoe beslissingen worden genomen)" value={data.organisatie.werking} onChange={v => s('organisatie','werking',v)} rows={2} />
-          </SubSection>
-          <SubSection letter="B" title="Merkidentiteit">
-            <Field label="Visuele identiteit (logo, kleuren, stijl)" value={data.merkidentiteit.visuelIdentiteit} onChange={v => s('merkidentiteit','visuelIdentiteit',v)} rows={2} />
-            <Field label="Tone of voice" value={data.merkidentiteit.toneOfVoice} onChange={v => s('merkidentiteit','toneOfVoice',v)} rows={2} />
-            <Field label="Consistentie van branding" value={data.merkidentiteit.consistentieBranding} onChange={v => s('merkidentiteit','consistentieBranding',v)} rows={2} />
-            <Field label="Waarden en missie" value={data.merkidentiteit.waardenMissie} onChange={v => s('merkidentiteit','waardenMissie',v)} rows={3} />
-            <Field label="Huidige positionering" hint="Wat probeert dit merk te zijn?" value={data.merkidentiteit.huidigePositionering} onChange={v => s('merkidentiteit','huidigePositionering',v)} rows={3} />
-          </SubSection>
-          <SubSection letter="C" title="Kanaalstrategie" subtitle="Op welke kanalen is het merk actief en waarom?">
-            <Field label="Actieve platformen" hint="Welke sociale media / kanalen gebruikt het merk?" value={data.kanaalstrategie.actievePlatformen} onChange={v => s('kanaalstrategie','actievePlatformen',v)} rows={2} />
-            <Field label="Strategische onderbouwing per platform" hint="Waarom wordt elk platform ingezet? Wat is het doel?" value={data.kanaalstrategie.onderbouwingPerPlatform} onChange={v => s('kanaalstrategie','onderbouwingPerPlatform',v)} rows={4} />
-            <Field label="Primair kanaal" hint="Waar zit de meeste focus en energie?" value={data.kanaalstrategie.primairKanaal} onChange={v => s('kanaalstrategie','primairKanaal',v)} rows={2} />
-            <Field label="Ontbrekende kanalen" hint="Welke kanalen worden niet gebruikt maar zijn wel relevant?" value={data.kanaalstrategie.ontbrekendeKanalen} onChange={v => s('kanaalstrategie','ontbrekendeKanalen',v)} rows={2} />
-          </SubSection>
-          <SubSection letter="D" title="Doelgroep (huidige)">
-            <Field label="Wie volgt het merk nu?" value={data.doelgroep.wieVolgt} onChange={v => s('doelgroep','wieVolgt',v)} rows={2} />
-            <Field label="Leeftijd / interesses" value={data.doelgroep.leeftijdInteresses} onChange={v => s('doelgroep','leeftijdInteresses',v)} rows={2} />
-            <Field label="Gedrag" value={data.doelgroep.gedrag} onChange={v => s('doelgroep','gedrag',v)} rows={2} />
-            <Field label="Engagement" value={data.doelgroep.engagement} onChange={v => s('doelgroep','engagement',v)} rows={2} />
-            <Field label="Community interactie" value={data.doelgroep.communityInteractie} onChange={v => s('doelgroep','communityInteractie',v)} rows={2} />
-            <Field label="Gewenste doelgroep" value={data.doelgroep.gewensteDoelgroep} onChange={v => s('doelgroep','gewensteDoelgroep',v)} rows={2} />
-            <Field label="Werkelijke doelgroep" value={data.doelgroep.werkelijkeDoelgroep} onChange={v => s('doelgroep','werkelijkeDoelgroep',v)} rows={2} />
-          </SubSection>
-          <SubSection letter="E" title="Contentanalyse" subtitle="Analyse van bestaande content.">
-            <GroupLabel label="Contentmix" />
-            {(() => {
-              const ca = data.contentanalyse;
-              const sc = (key, val) => s('contentanalyse', key, val);
-              const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
-              const mixLabels = ['Promo','Behind the scenes','Community','Storytelling','Events','Memes / cultuur'];
-              const werkelijkTotaal = mixKeys.reduce((sum, k) => sum + (Number(ca[k]) || 0), 0);
-              return (
-                <div>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Aantal geanalyseerde posts</label>
-                    <select
-                      className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                      value={ca.contentmixTotaal}
-                      onChange={e => sc('contentmixTotaal', Number(e.target.value))}
-                    >
-                      {[10, 20, 30, 50].map(n => <option key={n} value={n}>{n} posts</option>)}
-                    </select>
-                    {werkelijkTotaal > 0 && werkelijkTotaal !== ca.contentmixTotaal && (
-                      <p className="text-xs text-amber-500 mt-1">Totaal van ingevulde aantallen: {werkelijkTotaal} (wordt gebruikt voor percentages)</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    {mixKeys.map((key, i) => {
-                      const count = Number(ca[key]) || 0;
-                      const pct = werkelijkTotaal > 0 ? Math.round((count / werkelijkTotaal) * 100) : 0;
-                      return (
-                        <div key={key} className="flex items-center gap-3">
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CONTENTMIX_COLORS[i] }} />
-                          <label className="text-sm text-gray-700 flex-1">{mixLabels[i]}</label>
-                          <input
-                            type="number"
-                            min="0"
-                            className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition text-center"
-                            value={count === 0 ? '' : count}
-                            placeholder="0"
-                            onChange={e => sc(key, Math.max(0, parseInt(e.target.value) || 0))}
-                          />
-                          <span className="text-xs text-gray-400 w-9 text-right">{pct > 0 ? `${pct}%` : '—'}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {werkelijkTotaal > 0 && (
-                    <p className="text-xs text-gray-400 mt-3">Totaal: {werkelijkTotaal} posts</p>
-                  )}
-                </div>
-              );
-            })()}
-            <GroupLabel label="Formats" />
-            <p className="text-xs text-gray-500 mb-3 -mt-1">Geef het aantal posts per format in van je laatste 30 posts.</p>
-            {(() => {
-              const ca = data.contentanalyse;
-              const formatKeys = ['formatsFoto','formatsVideo','formatsReels','formatsCarousels'];
-              const totalFormats = formatKeys.reduce((sum, k) => sum + (Math.max(0, Number(ca[k]?.count) || 0)), 0);
-              const onderdrempel = totalFormats > 0 && totalFormats < 30;
-              return (
-                <>
-                  {[
-                    { key: 'formatsFoto',      label: 'Foto'      },
-                    { key: 'formatsVideo',     label: 'Video'     },
-                    { key: 'formatsReels',     label: 'Reels'     },
-                    { key: 'formatsCarousels', label: 'Carousels' },
-                  ].map(({ key, label }) => (
-                    <FormatField key={key} label={label} value={ca[key]} onChange={v => s('contentanalyse', key, v)} totalFormats={totalFormats} />
-                  ))}
-                  {onderdrempel && (
-                    <div className="mb-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-start gap-2">
-                      <span className="text-amber-400 shrink-0 mt-0.5">⚠</span>
-                      <p className="text-xs text-amber-700">Je hebt minder dan 30 posts ingegeven — de berekening is gebaseerd op je beschikbare data.</p>
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-400 mb-3 italic">De percentages worden automatisch berekend op basis van je ingegeven aantallen.</p>
-                </>
-              );
-            })()}
-            <GroupLabel label="Frequentie" tooltip="Posts zijn alle reguliere berichten op je feed. Stories zijn tijdelijke berichten die na 24 uur verdwijnen. Tel beide apart voor de laatste 4 weken." />
-            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2">
-              <span className="text-blue-400 shrink-0 mt-0.5 text-sm">ℹ</span>
-              <p className="text-xs text-blue-700 flex-1">Vul hieronder het totaal aantal posts en stories in van de afgelopen 4 weken. De app berekent automatisch het wekelijks gemiddelde.</p>
-              <Tooltip text="Tel alle posts en stories die je in de laatste 4 weken hebt geplaatst op het account. Kijk hiervoor in je Instagram profiel of in je contentkalender." />
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Aantal posts</label>
-                <input
-                  type="number" min="0"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                  placeholder="bijv. 20"
-                  value={data.contentanalyse.frequentiePostsAantal || ''}
-                  onChange={e => s('contentanalyse', 'frequentiePostsAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
-                />
-                {Number(data.contentanalyse.frequentiePostsAantal) > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">≈ {(Number(data.contentanalyse.frequentiePostsAantal) / 4).toFixed(1).replace('.0','')} per week</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Aantal stories</label>
-                <input
-                  type="number" min="0"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                  placeholder="bijv. 28"
-                  value={data.contentanalyse.frequentieStoriesAantal || ''}
-                  onChange={e => s('contentanalyse', 'frequentieStoriesAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
-                />
-                {Number(data.contentanalyse.frequentieStoriesAantal) > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">≈ {(Number(data.contentanalyse.frequentieStoriesAantal) / 4).toFixed(1).replace('.0','')} per week</p>
-                )}
-              </div>
-            </div>
-            <GroupLabel label="Performance (gemiddelden)" />
-            <Field label="Gemiddelde likes" value={data.contentanalyse.gemiddeldeLikes} onChange={v => s('contentanalyse','gemiddeldeLikes',v)} rows={1} />
-            <Field label="Gemiddelde comments" value={data.contentanalyse.gemiddeldeComments} onChange={v => s('contentanalyse','gemiddeldeComments',v)} rows={1} />
-            <Field label="Gemiddelde shares" value={data.contentanalyse.gemiddeldeShares} onChange={v => s('contentanalyse','gemiddeldeShares',v)} rows={1} />
-            <div className="mb-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">Heb je toegang tot Instagram Insights van dit account?</p>
-              <div className="flex gap-5 mb-3">
-                {[{ val: 'ja', label: 'Ja' }, { val: 'nee', label: 'Nee' }].map(({ val, label }) => (
-                  <label key={val} className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="radio"
-                      name="insightsAccess"
-                      value={val}
-                      checked={data.contentanalyse.insightsAccess === val}
-                      onChange={() => s('contentanalyse','insightsAccess',val)}
-                      className="accent-gray-800"
-                    />
-                    <span className="text-sm text-gray-700">{label}</span>
-                  </label>
-                ))}
-              </div>
-              {data.contentanalyse.insightsAccess === 'ja' && (
-                <Field
-                  label="Gemiddeld bereik van je laatste 10 posts"
-                  hint="Vind je dit in Instagram Insights → kies een post → bekijk Bereik. Doe dit voor 10 recente posts en bereken het gemiddelde."
-                  value={data.contentanalyse.gemiddeldBereik || ''}
-                  onChange={v => s('contentanalyse','gemiddeldBereik',v)}
-                  rows={1}
-                />
-              )}
-              {data.contentanalyse.insightsAccess === 'nee' && (
-                <Field
-                  label="Huidig aantal volgers"
-                  value={data.contentanalyse.aantalVolgers || ''}
-                  onChange={v => s('contentanalyse','aantalVolgers',v)}
-                  rows={1}
-                />
-              )}
-              {(() => {
-                const er = getEngagementRate(data.contentanalyse);
-                if (!er) return <p className="text-xs text-gray-400 italic mt-2">Vul het vereiste veld in om de engagement rate te berekenen.</p>;
-                const erNum = parseEngagementRate(er);
-                const erc = engagementRateColor(erNum);
-                return (
-                  <div className={`${erc.bg} border ${erc.border} rounded-xl px-4 py-3 flex items-center justify-between mt-2`}>
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-0.5">Engagement rate (automatisch berekend)</p>
-                      <p className={`text-xl font-bold ${erc.text}`}>{er}</p>
-                    </div>
-                    {erc.label && (
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>{erc.label}</span>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          </SubSection>
-          <SubSection letter="G" title="Strategische contentanalyse" subtitle="Niet alleen cijfers, maar ook inhoud.">
-            <Field label="Positioneringsconsistentie" value={data.strategischeContent.positioneringsconsistentie} onChange={v => s('strategischeContent','positioneringsconsistentie',v)} rows={3} />
-            <Field label="Tone of voice" value={data.strategischeContent.toneOfVoice} onChange={v => s('strategischeContent','toneOfVoice',v)} rows={3} />
-            <Field label="Storytelling" value={data.strategischeContent.storytelling} onChange={v => s('strategischeContent','storytelling',v)} rows={3} />
-            <Field label="Emotie" value={data.strategischeContent.emotie} onChange={v => s('strategischeContent','emotie',v)} rows={3} />
-            <Field label="Doelgroepresonantie" value={data.strategischeContent.doelgroepresonantie} onChange={v => s('strategischeContent','doelgroepresonantie',v)} rows={3} />
-            <Field label="Formatstrategie" value={data.strategischeContent.formatstrategie} onChange={v => s('strategischeContent','formatstrategie',v)} rows={3} />
-          </SubSection>
-          <SubSection letter="H" title="Community analyse">
-            <Field label="Interactie in comments" value={data.communityAnalyse.interactieComments} onChange={v => s('communityAnalyse','interactieComments',v)} rows={2} />
-            <Field label="Terugkerende fans" value={data.communityAnalyse.terugkerendeFans} onChange={v => s('communityAnalyse','terugkerendeFans',v)} rows={2} />
-            <Field label="User generated content" value={data.communityAnalyse.userGeneratedContent} onChange={v => s('communityAnalyse','userGeneratedContent',v)} rows={2} />
-            <Field label="DM interacties" value={data.communityAnalyse.dmInteracties} onChange={v => s('communityAnalyse','dmInteracties',v)} rows={2} />
-            <Field label="Community betrokkenheid" value={data.communityAnalyse.communityBetrokkenheid} onChange={v => s('communityAnalyse','communityBetrokkenheid',v)} rows={2} />
-            <Field label="Is dit een publiek of een echte community?" hint="Onderbouw je antwoord." value={data.communityAnalyse.publiefOfCommunity} onChange={v => s('communityAnalyse','publiefOfCommunity',v)} rows={4} />
-          </SubSection>
-          <SubSection letter="I" title="Middelen (resources)" subtitle="Dit bepaalt wat realistisch is.">
-            <Field label="Budget" value={data.middelen.budget} onChange={v => s('middelen','budget',v)} rows={2} />
-            <Field label="Tijd" value={data.middelen.tijd} onChange={v => s('middelen','tijd',v)} rows={2} />
-            <Field label="Team" value={data.middelen.team} onChange={v => s('middelen','team',v)} rows={2} />
-            <Field label="Netwerk" value={data.middelen.netwerk} onChange={v => s('middelen','netwerk',v)} rows={2} />
-            <Field label="Skills (design, video, etc.)" value={data.middelen.skills} onChange={v => s('middelen','skills',v)} rows={2} />
-          </SubSection>
-          <SubSection letter="J" title="SWOT analyse" subtitle="Pas nadat je alles onderzocht hebt.">
-            <Field label="Strengths — sterktes van het merk" value={data.swot.strengths} onChange={v => s('swot','strengths',v)} rows={4} />
-            <Field label="Weaknesses — interne zwaktes" value={data.swot.weaknesses} onChange={v => s('swot','weaknesses',v)} rows={4} />
-            <Field label="Opportunities — externe kansen" value={data.swot.opportunities} onChange={v => s('swot','opportunities',v)} rows={4} />
-            <Field label="Threats — externe bedreigingen" value={data.swot.threats} onChange={v => s('swot','threats',v)} rows={4} />
-          </SubSection>
-        </div>
-      );
-    }
-
-    // ─── Step 2: Externe Analyse form ─────────────────────────────────────────
-    ExterneAnalyseForm.propTypes = {
-      data: PropTypes.object.isRequired,
-      onChange: PropTypes.func.isRequired,
-    };
-
-    function ExterneAnalyseForm({ data, onChange }) {
-      const s = (section, key, val) => onChange({ ...data, [section]: { ...data[section], [key]: val } });
-
-      const concurrenten = Array.isArray(data.concurrentieanalyse) ? data.concurrentieanalyse : [emptyCompetitor()];
-      const setConcurrent = (i, key, val) => {
-        const updated = concurrenten.map((c, idx) => idx === i ? { ...c, [key]: val } : c);
-        onChange({ ...data, concurrentieanalyse: updated });
-      };
-      const addConcurrent = () => {
-        if (concurrenten.length >= 5) return;
-        onChange({ ...data, concurrentieanalyse: [...concurrenten, emptyCompetitor()] });
-      };
-      const removeConcurrent = (i) => {
-        if (concurrenten.length <= 1) return;
-        onChange({ ...data, concurrentieanalyse: concurrenten.filter((_, idx) => idx !== i) });
-      };
-
-      return (
-        <div className="fade-in">
-          <SubSection letter="A" title="Concurrentieanalyse" subtitle="Voeg tot 5 concurrenten toe.">
-            {concurrenten.map((c, i) => (
-              <div key={i} className="mb-6 border border-gray-100 rounded-xl p-4 bg-white">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Concurrent {i + 1}</p>
-                  {concurrenten.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeConcurrent(i)}
-                      className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                    >
-                      Verwijder
-                    </button>
-                  )}
-                </div>
-                <Field label="Naam concurrent" value={c.naam} onChange={v => setConcurrent(i,'naam',v)} rows={1} />
-                <Field label="Positionering" value={c.positionering} onChange={v => setConcurrent(i,'positionering',v)} rows={3} />
-                <Field label="Branding" value={c.branding} onChange={v => setConcurrent(i,'branding',v)} rows={3} />
-                <Field label="Content" value={c.content} onChange={v => setConcurrent(i,'content',v)} rows={3} />
-                <Field label="Community" value={c.community} onChange={v => setConcurrent(i,'community',v)} rows={3} />
-                <GroupLabel label="Frequentie" />
-                <div className="mb-4 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
-                  <p className="text-xs text-gray-500">Gebaseerd op de laatste 4 weken.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Aantal posts</label>
-                    <input
-                      type="number" min="0"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                      placeholder="bijv. 20"
-                      value={c.postsAantal || ''}
-                      onChange={e => setConcurrent(i, 'postsAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
-                    />
-                    {Number(c.postsAantal) > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">≈ {(Number(c.postsAantal) / 4).toFixed(1).replace('.0','')} per week</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Aantal stories</label>
-                    <input
-                      type="number" min="0"
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                      placeholder="bijv. 28"
-                      value={c.storiesAantal || ''}
-                      onChange={e => setConcurrent(i, 'storiesAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
-                    />
-                    {Number(c.storiesAantal) > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">≈ {(Number(c.storiesAantal) / 4).toFixed(1).replace('.0','')} per week</p>
-                    )}
-                  </div>
-                </div>
-                <GroupLabel label="Performance (gemiddelden)" />
-                <div className="grid grid-cols-2 gap-4 mb-4 mt-3">
-                  {[
-                    { label: 'Gemiddelde likes',    key: 'engagementLikes',    placeholder: 'bijv. 120' },
-                    { label: 'Gemiddelde comments', key: 'engagementComments', placeholder: 'bijv. 15'  },
-                    { label: 'Gemiddelde shares',   key: 'engagementShares',   placeholder: 'bijv. 5'   },
-                    { label: 'Aantal volgers',      key: 'engagementVolgers',  placeholder: 'bijv. 5000' },
-                  ].map(({ label, key, placeholder }) => (
-                    <div key={key}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                      <input
-                        type="number" min="0"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                        placeholder={placeholder}
-                        value={c[key] || ''}
-                        onChange={e => setConcurrent(i, key, e.target.value)}
-                      />
-                    </div>
-                  ))}
-                </div>
-                {(() => {
-                  const er = getCompetitorEngagementRate(c);
-                  if (!er) return <p className="text-xs text-gray-400 italic mb-4">Vul likes, comments en aantal volgers in om de engagement rate te berekenen.</p>;
-                  const erNum = parseEngagementRate(er);
-                  const erc = engagementRateColor(erNum);
-                  return (
-                    <div className={`${erc.bg} border ${erc.border} rounded-xl px-4 py-3 flex items-center justify-between mb-4`}>
-                      <div>
-                        <p className="text-xs font-medium text-gray-500 mb-0.5">Engagement rate (automatisch berekend)</p>
-                        <p className={`text-xl font-bold ${erc.text}`}>{er}</p>
-                        <p className="text-xs text-gray-400 italic mt-0.5">Berekend op basis van publieke data.</p>
-                      </div>
-                      {erc.label && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>{erc.label}</span>}
-                    </div>
-                  );
-                })()}
-                <Field label="Differentiatie" value={c.differentiatie} onChange={v => setConcurrent(i,'differentiatie',v)} rows={3} />
-                <Field label="Wat doen zij NIET?" hint="Daar zit vaak jouw kans." value={c.watDoenZijNiet} onChange={v => setConcurrent(i,'watDoenZijNiet',v)} rows={3} />
-              </div>
-            ))}
-            {concurrenten.length < 5 && (
-              <button
-                type="button"
-                onClick={addConcurrent}
-                className="w-full border border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors"
-              >
-                + Voeg concurrent toe
-              </button>
-            )}
-          </SubSection>
-          <SubSection letter="B" title="Samenwerkingen en netwerk" subtitle="Wie zijn de sleutelfiguren en partners?">
-            <Field label="Potentiële partners" hint="Artiesten, labels, merken, media…" value={data.samenwerkingen.potentielePartners} onChange={v => s('samenwerkingen','potentielePartners',v)} rows={3} />
-            <Field label="Gatekeepers in de scene" hint="Bloggers, curatoren, booking agents, promotors…" value={data.samenwerkingen.gatekeepers} onChange={v => s('samenwerkingen','gatekeepers',v)} rows={3} />
-            <Field label="Bestaande samenwerkingen en resultaten" value={data.samenwerkingen.bestaandeSamenwerkingen} onChange={v => s('samenwerkingen','bestaandeSamenwerkingen',v)} rows={4} />
-            <Field label="Ontbrekende samenwerkingen" hint="Welke connecties ontbreken nog?" value={data.samenwerkingen.ontbrekendeSamenwerkingen} onChange={v => s('samenwerkingen','ontbrekendeSamenwerkingen',v)} rows={3} />
-          </SubSection>
-          <SubSection letter="C" title="Markt / scene analyse">
-            <Field label="Grootte van de scene" value={data.marktSceneAnalyse.grootteScene} onChange={v => s('marktSceneAnalyse','grootteScene',v)} rows={2} />
-            <Field label="Populariteit van het genre" value={data.marktSceneAnalyse.populariteitGenre} onChange={v => s('marktSceneAnalyse','populariteitGenre',v)} rows={2} />
-            <Field label="Aantal events" value={data.marktSceneAnalyse.aantalEvents} onChange={v => s('marktSceneAnalyse','aantalEvents',v)} rows={2} />
-            <Field label="Andere labels / collectieven" value={data.marktSceneAnalyse.andereLabels} onChange={v => s('marktSceneAnalyse','andereLabels',v)} rows={2} />
-            <Field label="Marktverzadiging" value={data.marktSceneAnalyse.marktverzadiging} onChange={v => s('marktSceneAnalyse','marktverzadiging',v)} rows={2} />
-          </SubSection>
-          <SubSection letter="D" title="Doelgroepgedrag" subtitle="Niet alleen wie ze zijn, maar hoe ze handelen.">
-            <Field label="Hoe ontdekken ze muziek?" value={data.doelgroepgedrag.ontdekkingMuziek} onChange={v => s('doelgroepgedrag','ontdekkingMuziek',v)} rows={3} />
-            <Field label="Welke platformen gebruiken ze?" value={data.doelgroepgedrag.platformgebruik} onChange={v => s('doelgroepgedrag','platformgebruik',v)} rows={3} />
-            <Field label="Wat motiveert hen?" value={data.doelgroepgedrag.motivatie} onChange={v => s('doelgroepgedrag','motivatie',v)} rows={3} />
-            <Field label="Wie beïnvloedt hen?" value={data.doelgroepgedrag.invloeden} onChange={v => s('doelgroepgedrag','invloeden',v)} rows={3} />
-          </SubSection>
-          <SubSection letter="E" title="Culturele trends" subtitle="Voor muzieklabels zeer belangrijk.">
-            <Field label="Stijgende populariteit van een genre" value={data.cultureleTrends.genrePopulariteit} onChange={v => s('cultureleTrends','genrePopulariteit',v)} rows={3} />
-            <Field label="Nostalgie trends" value={data.cultureleTrends.nostalgieTrends} onChange={v => s('cultureleTrends','nostalgieTrends',v)} rows={3} />
-            <Field label="DIY cultuur" value={data.cultureleTrends.diyCultuur} onChange={v => s('cultureleTrends','diyCultuur',v)} rows={3} />
-            <Field label="Authenticiteit vs commercialisering" value={data.cultureleTrends.authenticiteitVsCommercialisering} onChange={v => s('cultureleTrends','authenticiteitVsCommercialisering',v)} rows={3} />
-          </SubSection>
-        </div>
-      );
-    }
-
-    // ─── Form Screen ──────────────────────────────────────────────────────────
+    // ─── Form Screen (8-step wizard) ──────────────────────────────────────────
     FormScreen.propTypes = {
       initial: PropTypes.object,
       onSave: PropTypes.func.isRequired,
@@ -2966,90 +3292,472 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
     };
 
     function FormScreen({ initial, onSave, onBack }) {
-      const TOTAL = 3;
+      const TOTAL = 8;
+      const STEP_TITLES = [
+        'Basisinfo',
+        'Organisatie & Merkidentiteit',
+        'Kanalen & Doelgroep',
+        'Contentanalyse',
+        'Strategie & Community',
+        'Middelen & SWOT',
+        'Concurrentieanalyse',
+        'Externe Analyse',
+      ];
+
       const [step, setStep] = useState(1);
       const [klantnaam, setKlantnaam] = useState(initial?.klantnaam || '');
+      const [sector, setSector] = useState(initial?.sector || '');
       const [data, setData] = useState(() => {
         if (!initial) return emptyData();
         return migrateAnalysis(initial);
       });
 
-      const top = () => window.scrollTo({ top: 0, behavior: 'smooth' });
-      const next = () => { setStep(s => s + 1); top(); };
-      const prev = () => { setStep(s => s - 1); top(); };
+      const int = data.interneAnalyse;
+      const ext = data.externeAnalyse;
 
-      const handleSave = () => onSave({ ...data, klantnaam: klantnaam.trim() });
+      const si = (section, key, val) =>
+        setData(d => ({ ...d, interneAnalyse: { ...d.interneAnalyse, [section]: { ...d.interneAnalyse[section], [key]: val } } }));
+      const se = (section, key, val) =>
+        setData(d => ({ ...d, externeAnalyse: { ...d.externeAnalyse, [section]: { ...d.externeAnalyse[section], [key]: val } } }));
 
-      const handleExport = () => exportAnalysis({
-        ...data,
-        klantnaam: klantnaam.trim() || 'export',
-        datum: initial?.datum || new Date().toISOString(),
-      });
+      const setConcurrent = (i, key, val) => {
+        setData(d => {
+          const curr = Array.isArray(d.externeAnalyse.concurrentieanalyse) ? d.externeAnalyse.concurrentieanalyse : [emptyCompetitor()];
+          return { ...d, externeAnalyse: { ...d.externeAnalyse, concurrentieanalyse: curr.map((c, idx) => idx === i ? { ...c, [key]: val } : c) } };
+        });
+      };
+      const addConcurrent = () => {
+        setData(d => {
+          const curr = Array.isArray(d.externeAnalyse.concurrentieanalyse) ? d.externeAnalyse.concurrentieanalyse : [emptyCompetitor()];
+          if (curr.length >= 5) return d;
+          return { ...d, externeAnalyse: { ...d.externeAnalyse, concurrentieanalyse: [...curr, emptyCompetitor()] } };
+        });
+      };
+      const removeConcurrent = (i) => {
+        setData(d => {
+          const curr = Array.isArray(d.externeAnalyse.concurrentieanalyse) ? d.externeAnalyse.concurrentieanalyse : [emptyCompetitor()];
+          if (curr.length <= 1) return d;
+          return { ...d, externeAnalyse: { ...d.externeAnalyse, concurrentieanalyse: curr.filter((_, idx) => idx !== i) } };
+        });
+      };
+
+      const stepComplete = (s) => {
+        switch (s) {
+          case 1: return klantnaam.trim().length > 0;
+          case 2: return !!(int.organisatie.labelType || int.merkidentiteit.huidigePositionering);
+          case 3: return !!int.kanaalstrategie.actievePlatformen;
+          case 4: return !!(int.contentanalyse.gemiddeldeLikes || int.contentanalyse.contentmixPromo > 0 || int.contentanalyse.frequentiePostsAantal);
+          case 5: return !!(int.strategischeContent.positioneringsconsistentie || int.communityAnalyse.interactieComments);
+          case 6: return !!(int.middelen.budget || int.swot.strengths);
+          case 7: return !!(Array.isArray(ext.concurrentieanalyse) && ext.concurrentieanalyse[0]?.naam);
+          case 8: return !!(ext.marktSceneAnalyse.grootteScene || ext.cultureleTrends.genrePopulariteit || ext.doelgroepgedrag.ontdekkingMuziek);
+          default: return false;
+        }
+      };
+
+      const completions = Array.from({ length: TOTAL }, (_, i) => stepComplete(i + 1));
+      const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+      const next = () => { setStep(s => Math.min(s + 1, TOTAL)); scrollTop(); };
+      const prev = () => { setStep(s => Math.max(s - 1, 1)); scrollTop(); };
+
+      const doSave = (goToDashboard = false) => {
+        onSave({ ...data, klantnaam: klantnaam.trim() || 'Naamloos', sector: sector.trim() }, goToDashboard);
+      };
+
+      const concurrenten = Array.isArray(ext.concurrentieanalyse) ? ext.concurrentieanalyse : [emptyCompetitor()];
 
       return (
-        <div className="min-h-screen bg-gray-50">
-          <div className="max-w-2xl mx-auto px-4 py-10">
-            <button onClick={onBack} className="text-sm text-gray-400 hover:text-gray-700 mb-6 transition-colors inline-flex items-center gap-1">
-              ← Terug
-            </button>
-            <ProgressBar step={step} total={TOTAL} />
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-100 py-4 shadow-sm">
+            <WizardProgressBar step={step} total={TOTAL} title={STEP_TITLES[step - 1]} completions={completions} />
+          </div>
 
-            {step === 1 && (
-              <>
-                <div className="mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">1. Interne Brandanalyse</h2>
-                  <p className="text-sm text-gray-400 mt-1">Wat het merk intern is en doet.</p>
-                </div>
-                <InterneAnalyseForm data={data.interneAnalyse} onChange={v => setData(d => ({ ...d, interneAnalyse: v }))} />
-              </>
-            )}
-            {step === 2 && (
-              <>
-                <div className="mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">2. Externe Analyse</h2>
-                  <p className="text-sm text-gray-400 mt-1">De omgeving van het merk.</p>
-                </div>
-                <ExterneAnalyseForm data={data.externeAnalyse} onChange={v => setData(d => ({ ...d, externeAnalyse: v }))} />
-              </>
-            )}
-            {step === 3 && (
-              <div className="fade-in">
-                <div className="mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Analyse opslaan</h2>
-                  <p className="text-sm text-gray-400 mt-1">Geef de analyse een naam.</p>
-                </div>
-                <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Klantnaam</label>
-                  <input
-                    type="text" autoFocus
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                    placeholder="bijv. Studio Lumière"
-                    value={klantnaam}
-                    onChange={e => setKlantnaam(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && klantnaam.trim() && handleSave()}
-                  />
-                  <p className="text-xs text-gray-400 mt-2">Deze naam verschijnt in het overzicht.</p>
-                </div>
-              </div>
-            )}
+          <div className="flex-1">
+            <div className="max-w-2xl mx-auto px-4 py-6">
 
-            <div className="flex justify-between items-center mt-10 pt-6 border-t border-gray-100">
-              <button onClick={step === 1 ? onBack : prev} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
-                ← Vorige
+              {step === 1 && (
+                <div className="fade-in">
+                  <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm space-y-5">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Klantnaam <span className="text-red-400">*</span></label>
+                      <input
+                        autoFocus type="text"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        placeholder="bijv. Studio Lumière"
+                        value={klantnaam}
+                        onChange={e => setKlantnaam(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sector / genre</label>
+                      <input
+                        type="text"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        placeholder="bijv. Elektronische muziek, Mode, ..."
+                        value={sector}
+                        onChange={e => setSector(e.target.value)}
+                      />
+                    </div>
+                    {initial?.datum && (
+                      <p className="text-xs text-gray-400">Aangemaakt op: {new Date(initial.datum).toLocaleDateString('nl-BE')}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {step === 2 && (
+                <div className="fade-in">
+                  <SubSection letter="A" title="Organisatie / structuur" subtitle="Bepaalt middelen en mogelijkheden.">
+                    <Field label="Wat voor label / bedrijf is het?" value={int.organisatie.labelType} onChange={v => si('organisatie','labelType',v)} rows={2} />
+                    <Field label="Geschiedenis van het merk" value={int.organisatie.geschiedenis} onChange={v => si('organisatie','geschiedenis',v)} rows={3} />
+                    <GroupLabel label="Teamleden" tooltip="Voeg elk teamlid toe met naam, functietitel en rol. Vink de teamleader aan — die verschijnt bovenaan in het organogram." />
+                    <TeamEditor value={int.organisatie.teamleden || []} onChange={v => si('organisatie','teamleden',v)} />
+                    <Field label="Werking (hoe beslissingen worden genomen)" value={int.organisatie.werking} onChange={v => si('organisatie','werking',v)} rows={2} />
+                  </SubSection>
+                  <SubSection letter="B" title="Merkidentiteit">
+                    <Field label="Visuele identiteit (logo, kleuren, stijl)" value={int.merkidentiteit.visuelIdentiteit} onChange={v => si('merkidentiteit','visuelIdentiteit',v)} rows={2} />
+                    <Field label="Tone of voice" value={int.merkidentiteit.toneOfVoice} onChange={v => si('merkidentiteit','toneOfVoice',v)} rows={2} />
+                    <Field label="Consistentie van branding" value={int.merkidentiteit.consistentieBranding} onChange={v => si('merkidentiteit','consistentieBranding',v)} rows={2} />
+                    <Field label="Waarden en missie" value={int.merkidentiteit.waardenMissie} onChange={v => si('merkidentiteit','waardenMissie',v)} rows={2} />
+                    <Field label="Huidige positionering" hint="Wat probeert dit merk te zijn?" value={int.merkidentiteit.huidigePositionering} onChange={v => si('merkidentiteit','huidigePositionering',v)} rows={2} />
+                  </SubSection>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="fade-in">
+                  <SubSection letter="C" title="Kanaalstrategie" subtitle="Op welke kanalen is het merk actief en waarom?">
+                    <Field label="Actieve platformen" hint="Welke sociale media / kanalen gebruikt het merk?" value={int.kanaalstrategie.actievePlatformen} onChange={v => si('kanaalstrategie','actievePlatformen',v)} rows={2} />
+                    <Field label="Strategische onderbouwing per platform" hint="Waarom wordt elk platform ingezet?" value={int.kanaalstrategie.onderbouwingPerPlatform} onChange={v => si('kanaalstrategie','onderbouwingPerPlatform',v)} rows={3} />
+                    <Field label="Primair kanaal" hint="Waar zit de meeste focus en energie?" value={int.kanaalstrategie.primairKanaal} onChange={v => si('kanaalstrategie','primairKanaal',v)} rows={2} />
+                    <Field label="Ontbrekende kanalen" hint="Welke kanalen worden niet gebruikt maar zijn wel relevant?" value={int.kanaalstrategie.ontbrekendeKanalen} onChange={v => si('kanaalstrategie','ontbrekendeKanalen',v)} rows={2} />
+                  </SubSection>
+                  <SubSection letter="D" title="Doelgroep (huidige)">
+                    <Field label="Wie volgt het merk nu?" value={int.doelgroep.wieVolgt} onChange={v => si('doelgroep','wieVolgt',v)} rows={2} />
+                    <Field label="Leeftijd / interesses" value={int.doelgroep.leeftijdInteresses} onChange={v => si('doelgroep','leeftijdInteresses',v)} rows={2} />
+                    <Field label="Gedrag" value={int.doelgroep.gedrag} onChange={v => si('doelgroep','gedrag',v)} rows={2} />
+                    <Field label="Engagement" value={int.doelgroep.engagement} onChange={v => si('doelgroep','engagement',v)} rows={2} />
+                    <Field label="Community interactie" value={int.doelgroep.communityInteractie} onChange={v => si('doelgroep','communityInteractie',v)} rows={2} />
+                    <Field label="Gewenste doelgroep" value={int.doelgroep.gewensteDoelgroep} onChange={v => si('doelgroep','gewensteDoelgroep',v)} rows={2} />
+                    <Field label="Werkelijke doelgroep" value={int.doelgroep.werkelijkeDoelgroep} onChange={v => si('doelgroep','werkelijkeDoelgroep',v)} rows={2} />
+                  </SubSection>
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="fade-in">
+                  <SubSection letter="E" title="Contentanalyse" subtitle="Analyse van bestaande content.">
+                    <GroupLabel label="Contentmix" />
+                    {(() => {
+                      const ca = int.contentanalyse;
+                      const mixKeys = ['contentmixPromo','contentmixBehindScenes','contentmixCommunity','contentmixStorytelling','contentmixEvents','contentmixMemes'];
+                      const mixLabels = ['Promo','Behind the scenes','Community','Storytelling','Events','Memes / cultuur'];
+                      const werkelijkTotaal = mixKeys.reduce((sum, k) => sum + (Number(ca[k]) || 0), 0);
+                      return (
+                        <div>
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Aantal geanalyseerde posts</label>
+                            <select
+                              className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                              value={ca.contentmixTotaal}
+                              onChange={e => si('contentanalyse','contentmixTotaal', Number(e.target.value))}
+                            >
+                              {[10, 20, 30, 50].map(n => <option key={n} value={n}>{n} posts</option>)}
+                            </select>
+                          </div>
+                          <div className="space-y-2 mb-4">
+                            {mixKeys.map((key, i) => {
+                              const count = Number(ca[key]) || 0;
+                              const pct = werkelijkTotaal > 0 ? Math.round((count / werkelijkTotaal) * 100) : 0;
+                              return (
+                                <div key={key} className="flex items-center gap-3">
+                                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CONTENTMIX_COLORS[i] }} />
+                                  <label className="text-sm text-gray-700 flex-1">{mixLabels[i]}</label>
+                                  <input
+                                    type="number" min="0"
+                                    className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition text-center"
+                                    value={count === 0 ? '' : count}
+                                    placeholder="0"
+                                    onChange={e => si('contentanalyse', key, Math.max(0, parseInt(e.target.value) || 0))}
+                                  />
+                                  <span className="text-xs text-gray-400 w-9 text-right">{pct > 0 ? `${pct}%` : '—'}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    <GroupLabel label="Formats" />
+                    {(() => {
+                      const ca = int.contentanalyse;
+                      const formatKeys = ['formatsFoto','formatsVideo','formatsReels','formatsCarousels'];
+                      const totalFormats = formatKeys.reduce((sum, k) => sum + (Math.max(0, Number(ca[k]?.count) || 0)), 0);
+                      return (
+                        <>
+                          {[
+                            { key: 'formatsFoto', label: 'Foto' },
+                            { key: 'formatsVideo', label: 'Video' },
+                            { key: 'formatsReels', label: 'Reels' },
+                            { key: 'formatsCarousels', label: 'Carousels' },
+                          ].map(({ key, label }) => (
+                            <FormatField key={key} label={label} value={ca[key]} onChange={v => si('contentanalyse', key, v)} totalFormats={totalFormats} />
+                          ))}
+                        </>
+                      );
+                    })()}
+                    <GroupLabel label="Frequentie" tooltip="Tel posts en stories apart voor de laatste 4 weken." />
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Aantal posts</label>
+                        <input type="number" min="0"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                          placeholder="bijv. 20"
+                          value={int.contentanalyse.frequentiePostsAantal || ''}
+                          onChange={e => si('contentanalyse','frequentiePostsAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
+                        />
+                        {Number(int.contentanalyse.frequentiePostsAantal) > 0 && (
+                          <p className="text-xs text-gray-400 mt-1">≈ {(Number(int.contentanalyse.frequentiePostsAantal) / 4).toFixed(1).replace('.0','')} per week</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Aantal stories</label>
+                        <input type="number" min="0"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                          placeholder="bijv. 28"
+                          value={int.contentanalyse.frequentieStoriesAantal || ''}
+                          onChange={e => si('contentanalyse','frequentieStoriesAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
+                        />
+                        {Number(int.contentanalyse.frequentieStoriesAantal) > 0 && (
+                          <p className="text-xs text-gray-400 mt-1">≈ {(Number(int.contentanalyse.frequentieStoriesAantal) / 4).toFixed(1).replace('.0','')} per week</p>
+                        )}
+                      </div>
+                    </div>
+                    <GroupLabel label="Performance (gemiddelden)" />
+                    <Field label="Gemiddelde likes" value={int.contentanalyse.gemiddeldeLikes} onChange={v => si('contentanalyse','gemiddeldeLikes',v)} rows={1} />
+                    <Field label="Gemiddelde comments" value={int.contentanalyse.gemiddeldeComments} onChange={v => si('contentanalyse','gemiddeldeComments',v)} rows={1} />
+                    <Field label="Gemiddelde shares" value={int.contentanalyse.gemiddeldeShares} onChange={v => si('contentanalyse','gemiddeldeShares',v)} rows={1} />
+                    <div className="mb-4">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Heb je toegang tot Instagram Insights?</p>
+                      <div className="flex gap-5 mb-3">
+                        {[{ val: 'ja', label: 'Ja' }, { val: 'nee', label: 'Nee' }].map(({ val, label }) => (
+                          <label key={val} className="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="radio" name="insightsAccess" value={val}
+                              checked={int.contentanalyse.insightsAccess === val}
+                              onChange={() => si('contentanalyse','insightsAccess',val)}
+                              className="accent-gray-800"
+                            />
+                            <span className="text-sm text-gray-700">{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {int.contentanalyse.insightsAccess === 'ja' && (
+                        <Field label="Gemiddeld bereik van je laatste 10 posts"
+                          hint="Vind je dit in Instagram Insights → kies een post → bekijk Bereik."
+                          value={int.contentanalyse.gemiddeldBereik || ''} onChange={v => si('contentanalyse','gemiddeldBereik',v)} rows={1} />
+                      )}
+                      {int.contentanalyse.insightsAccess === 'nee' && (
+                        <Field label="Huidig aantal volgers"
+                          value={int.contentanalyse.aantalVolgers || ''} onChange={v => si('contentanalyse','aantalVolgers',v)} rows={1} />
+                      )}
+                      {(() => {
+                        const er = getEngagementRate(int.contentanalyse);
+                        if (!er) return null;
+                        const erNum = parseEngagementRate(er);
+                        const erc = engagementRateColor(erNum);
+                        return (
+                          <div className={`${erc.bg} border ${erc.border} rounded-xl px-4 py-3 flex items-center justify-between mt-2`}>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 mb-0.5">Engagement rate (automatisch berekend)</p>
+                              <p className={`text-xl font-bold ${erc.text}`}>{er}</p>
+                            </div>
+                            {erc.label && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>{erc.label}</span>}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </SubSection>
+                </div>
+              )}
+
+              {step === 5 && (
+                <div className="fade-in">
+                  <SubSection letter="G" title="Strategische contentanalyse" subtitle="Niet alleen cijfers, maar ook inhoud.">
+                    <Field label="Positioneringsconsistentie" value={int.strategischeContent.positioneringsconsistentie} onChange={v => si('strategischeContent','positioneringsconsistentie',v)} rows={3} />
+                    <Field label="Tone of voice" value={int.strategischeContent.toneOfVoice} onChange={v => si('strategischeContent','toneOfVoice',v)} rows={3} />
+                    <Field label="Storytelling" value={int.strategischeContent.storytelling} onChange={v => si('strategischeContent','storytelling',v)} rows={3} />
+                    <Field label="Emotie" value={int.strategischeContent.emotie} onChange={v => si('strategischeContent','emotie',v)} rows={3} />
+                    <Field label="Doelgroepresonantie" value={int.strategischeContent.doelgroepresonantie} onChange={v => si('strategischeContent','doelgroepresonantie',v)} rows={3} />
+                    <Field label="Formatstrategie" value={int.strategischeContent.formatstrategie} onChange={v => si('strategischeContent','formatstrategie',v)} rows={3} />
+                  </SubSection>
+                  <SubSection letter="H" title="Community analyse">
+                    <Field label="Interactie in comments" value={int.communityAnalyse.interactieComments} onChange={v => si('communityAnalyse','interactieComments',v)} rows={2} />
+                    <Field label="Terugkerende fans" value={int.communityAnalyse.terugkerendeFans} onChange={v => si('communityAnalyse','terugkerendeFans',v)} rows={2} />
+                    <Field label="User generated content" value={int.communityAnalyse.userGeneratedContent} onChange={v => si('communityAnalyse','userGeneratedContent',v)} rows={2} />
+                    <Field label="DM interacties" value={int.communityAnalyse.dmInteracties} onChange={v => si('communityAnalyse','dmInteracties',v)} rows={2} />
+                    <Field label="Community betrokkenheid" value={int.communityAnalyse.communityBetrokkenheid} onChange={v => si('communityAnalyse','communityBetrokkenheid',v)} rows={2} />
+                    <Field label="Is dit een publiek of een echte community?" hint="Onderbouw je antwoord." value={int.communityAnalyse.publiefOfCommunity} onChange={v => si('communityAnalyse','publiefOfCommunity',v)} rows={3} />
+                  </SubSection>
+                </div>
+              )}
+
+              {step === 6 && (
+                <div className="fade-in">
+                  <SubSection letter="I" title="Middelen (resources)" subtitle="Dit bepaalt wat realistisch is.">
+                    <Field label="Budget" value={int.middelen.budget} onChange={v => si('middelen','budget',v)} rows={2} />
+                    <Field label="Tijd" value={int.middelen.tijd} onChange={v => si('middelen','tijd',v)} rows={2} />
+                    <Field label="Team" value={int.middelen.team} onChange={v => si('middelen','team',v)} rows={2} />
+                    <Field label="Netwerk" value={int.middelen.netwerk} onChange={v => si('middelen','netwerk',v)} rows={2} />
+                    <Field label="Skills (design, video, etc.)" value={int.middelen.skills} onChange={v => si('middelen','skills',v)} rows={2} />
+                  </SubSection>
+                  <SubSection letter="J" title="SWOT analyse" subtitle="Pas nadat je alles onderzocht hebt.">
+                    <Field label="Strengths — sterktes van het merk" value={int.swot.strengths} onChange={v => si('swot','strengths',v)} rows={3} />
+                    <Field label="Weaknesses — interne zwaktes" value={int.swot.weaknesses} onChange={v => si('swot','weaknesses',v)} rows={3} />
+                    <Field label="Opportunities — externe kansen" value={int.swot.opportunities} onChange={v => si('swot','opportunities',v)} rows={3} />
+                    <Field label="Threats — externe bedreigingen" value={int.swot.threats} onChange={v => si('swot','threats',v)} rows={3} />
+                  </SubSection>
+                </div>
+              )}
+
+              {step === 7 && (
+                <div className="fade-in">
+                  <SubSection letter="A" title="Concurrentieanalyse" subtitle="Voeg tot 5 concurrenten toe.">
+                    {concurrenten.map((c, i) => (
+                      <div key={i} className="mb-6 border border-gray-100 rounded-xl p-4 bg-white">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Concurrent {i + 1}</p>
+                          {concurrenten.length > 1 && (
+                            <button type="button" onClick={() => removeConcurrent(i)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Verwijder</button>
+                          )}
+                        </div>
+                        <Field label="Naam concurrent" value={c.naam} onChange={v => setConcurrent(i,'naam',v)} rows={1} />
+                        <Field label="Positionering" value={c.positionering} onChange={v => setConcurrent(i,'positionering',v)} rows={2} />
+                        <Field label="Branding" value={c.branding} onChange={v => setConcurrent(i,'branding',v)} rows={2} />
+                        <Field label="Content" value={c.content} onChange={v => setConcurrent(i,'content',v)} rows={2} />
+                        <Field label="Community" value={c.community} onChange={v => setConcurrent(i,'community',v)} rows={2} />
+                        <GroupLabel label="Frequentie" />
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Aantal posts</label>
+                            <input type="number" min="0"
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                              placeholder="bijv. 20" value={c.postsAantal || ''}
+                              onChange={e => setConcurrent(i,'postsAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
+                            />
+                            {Number(c.postsAantal) > 0 && <p className="text-xs text-gray-400 mt-1">≈ {(Number(c.postsAantal)/4).toFixed(1).replace('.0','')} per week</p>}
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Aantal stories</label>
+                            <input type="number" min="0"
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                              placeholder="bijv. 28" value={c.storiesAantal || ''}
+                              onChange={e => setConcurrent(i,'storiesAantal', parseInt(e.target.value) > 0 ? parseInt(e.target.value) : '')}
+                            />
+                            {Number(c.storiesAantal) > 0 && <p className="text-xs text-gray-400 mt-1">≈ {(Number(c.storiesAantal)/4).toFixed(1).replace('.0','')} per week</p>}
+                          </div>
+                        </div>
+                        <GroupLabel label="Performance (gemiddelden)" />
+                        <div className="grid grid-cols-2 gap-4 mb-4 mt-3">
+                          {[
+                            { label: 'Gemiddelde likes',    key: 'engagementLikes',    placeholder: 'bijv. 120'  },
+                            { label: 'Gemiddelde comments', key: 'engagementComments', placeholder: 'bijv. 15'   },
+                            { label: 'Gemiddelde shares',   key: 'engagementShares',   placeholder: 'bijv. 5'    },
+                            { label: 'Aantal volgers',      key: 'engagementVolgers',  placeholder: 'bijv. 5000' },
+                          ].map(({ label, key, placeholder }) => (
+                            <div key={key}>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                              <input type="number" min="0"
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                                placeholder={placeholder} value={c[key] || ''}
+                                onChange={e => setConcurrent(i, key, e.target.value)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        {(() => {
+                          const er = getCompetitorEngagementRate(c);
+                          if (!er) return null;
+                          const erNum = parseEngagementRate(er);
+                          const erc = engagementRateColor(erNum);
+                          return (
+                            <div className={`${erc.bg} border ${erc.border} rounded-xl px-4 py-3 flex items-center justify-between mb-4`}>
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-0.5">Engagement rate (automatisch berekend)</p>
+                                <p className={`text-xl font-bold ${erc.text}`}>{er}</p>
+                              </div>
+                              {erc.label && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${erc.bg} ${erc.text} ${erc.border}`}>{erc.label}</span>}
+                            </div>
+                          );
+                        })()}
+                        <Field label="Differentiatie" value={c.differentiatie} onChange={v => setConcurrent(i,'differentiatie',v)} rows={2} />
+                        <Field label="Wat doen zij NIET?" hint="Daar zit vaak jouw kans." value={c.watDoenZijNiet} onChange={v => setConcurrent(i,'watDoenZijNiet',v)} rows={2} />
+                      </div>
+                    ))}
+                    {concurrenten.length < 5 && (
+                      <button type="button" onClick={addConcurrent}
+                        className="w-full border border-dashed border-gray-200 rounded-xl py-3 text-sm text-gray-400 hover:border-gray-400 hover:text-gray-600 transition-colors">
+                        + Voeg concurrent toe
+                      </button>
+                    )}
+                  </SubSection>
+                </div>
+              )}
+
+              {step === 8 && (
+                <div className="fade-in">
+                  <SubSection letter="B" title="Samenwerkingen en netwerk" subtitle="Wie zijn de sleutelfiguren en partners?">
+                    <Field label="Potentiële partners" hint="Artiesten, labels, merken, media…" value={ext.samenwerkingen.potentielePartners} onChange={v => se('samenwerkingen','potentielePartners',v)} rows={3} />
+                    <Field label="Gatekeepers in de scene" hint="Bloggers, curatoren, booking agents, promotors…" value={ext.samenwerkingen.gatekeepers} onChange={v => se('samenwerkingen','gatekeepers',v)} rows={3} />
+                    <Field label="Bestaande samenwerkingen en resultaten" value={ext.samenwerkingen.bestaandeSamenwerkingen} onChange={v => se('samenwerkingen','bestaandeSamenwerkingen',v)} rows={3} />
+                    <Field label="Ontbrekende samenwerkingen" hint="Welke connecties ontbreken nog?" value={ext.samenwerkingen.ontbrekendeSamenwerkingen} onChange={v => se('samenwerkingen','ontbrekendeSamenwerkingen',v)} rows={3} />
+                  </SubSection>
+                  <SubSection letter="C" title="Markt / scene analyse">
+                    <Field label="Grootte van de scene" value={ext.marktSceneAnalyse.grootteScene} onChange={v => se('marktSceneAnalyse','grootteScene',v)} rows={2} />
+                    <Field label="Populariteit van het genre" value={ext.marktSceneAnalyse.populariteitGenre} onChange={v => se('marktSceneAnalyse','populariteitGenre',v)} rows={2} />
+                    <Field label="Aantal events" value={ext.marktSceneAnalyse.aantalEvents} onChange={v => se('marktSceneAnalyse','aantalEvents',v)} rows={2} />
+                    <Field label="Andere labels / collectieven" value={ext.marktSceneAnalyse.andereLabels} onChange={v => se('marktSceneAnalyse','andereLabels',v)} rows={2} />
+                    <Field label="Marktverzadiging" value={ext.marktSceneAnalyse.marktverzadiging} onChange={v => se('marktSceneAnalyse','marktverzadiging',v)} rows={2} />
+                  </SubSection>
+                  <SubSection letter="D" title="Doelgroepgedrag" subtitle="Niet alleen wie ze zijn, maar hoe ze handelen.">
+                    <Field label="Hoe ontdekken ze muziek?" value={ext.doelgroepgedrag.ontdekkingMuziek} onChange={v => se('doelgroepgedrag','ontdekkingMuziek',v)} rows={3} />
+                    <Field label="Welke platformen gebruiken ze?" value={ext.doelgroepgedrag.platformgebruik} onChange={v => se('doelgroepgedrag','platformgebruik',v)} rows={2} />
+                    <Field label="Wat motiveert hen?" value={ext.doelgroepgedrag.motivatie} onChange={v => se('doelgroepgedrag','motivatie',v)} rows={2} />
+                    <Field label="Wie beïnvloedt hen?" value={ext.doelgroepgedrag.invloeden} onChange={v => se('doelgroepgedrag','invloeden',v)} rows={2} />
+                  </SubSection>
+                  <SubSection letter="E" title="Culturele trends" subtitle="Voor muzieklabels zeer belangrijk.">
+                    <Field label="Stijgende populariteit van een genre" value={ext.cultureleTrends.genrePopulariteit} onChange={v => se('cultureleTrends','genrePopulariteit',v)} rows={2} />
+                    <Field label="Nostalgie trends" value={ext.cultureleTrends.nostalgieTrends} onChange={v => se('cultureleTrends','nostalgieTrends',v)} rows={2} />
+                    <Field label="DIY cultuur" value={ext.cultureleTrends.diyCultuur} onChange={v => se('cultureleTrends','diyCultuur',v)} rows={2} />
+                    <Field label="Authenticiteit vs commercialisering" value={ext.cultureleTrends.authenticiteitVsCommercialisering} onChange={v => se('cultureleTrends','authenticiteitVsCommercialisering',v)} rows={2} />
+                  </SubSection>
+                </div>
+              )}
+
+            </div>
+          </div>
+
+          <div className="sticky bottom-0 bg-white border-t border-gray-100 shadow-sm">
+            <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+              <button
+                onClick={step === 1 ? onBack : prev}
+                className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
+              >
+                ← {step === 1 ? 'Annuleer' : 'Vorige'}
               </button>
               <div className="flex items-center gap-3">
-                {step === 3 && (
-                  <button onClick={handleExport} className="text-sm text-gray-500 border border-gray-200 bg-white px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
-                    Exporteer JSON
-                  </button>
-                )}
+                <button
+                  onClick={() => doSave(false)}
+                  className="text-sm text-gray-500 border border-gray-200 bg-white px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Sla op en sluit
+                </button>
                 {step < TOTAL ? (
                   <button onClick={next} className="bg-gray-900 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-gray-700 transition-colors">
                     Volgende →
                   </button>
                 ) : (
-                  <button onClick={handleSave} disabled={!klantnaam.trim()} className="bg-gray-900 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                    Opslaan
+                  <button onClick={() => doSave(true)} className="bg-gray-900 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-gray-700 transition-colors">
+                    Voltooi analyse →
                   </button>
                 )}
               </div>
@@ -3178,7 +3886,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
         setAnalyses(list);
       };
 
-      const handleSave = (data) => {
+      const handleSave = (data, goToDashboard = false) => {
         let saved;
         if (editing) {
           saved = { ...data, id: editing.id, datum: editing.datum };
@@ -3187,8 +3895,7 @@ table{width:100%;border-collapse:collapse;font-size:10px;margin:6px 0}td,th{bord
           saved = { ...data, id: generateId(), datum: new Date().toISOString() };
           persist([saved, ...analyses]);
         }
-        // If we came from dashboard, return there with updated data
-        if (viewing) {
+        if (viewing || goToDashboard) {
           setViewing(saved);
           setScreen('dashboard');
         } else {

@@ -1,14 +1,48 @@
 # Marketing Analyse App — Savestate
 
 ## Laatste opslag
-**Datum:** 2026-03-20
-**Commit hash:** `3661b1c` *(zie ook: 38f8d22, f83c460)*
+**Datum:** 2026-03-23
+**Commit hash:** *(wordt ingevuld na commit)*
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
 
 ---
 
 ## Samenvatting recente wijzigingen
+
+### Sessie 2026-03-23 — Export modal
+
+#### Exportfunctionaliteit herbouwd
+1. **ExportModal component** — Modaal venster dat opent bij klik op "Exporteer"-knop in de dashboard header
+2. **Selectieopties** — "Volledige analyse" (alles); individuele checkboxes: Samenvatting, Interne Analyse (volledig), Externe Analyse (volledig), Persona's
+3. **Individuele secties uitklapbaar** — Accordeon-sectie met Intern (9 secties) en Extern (5 secties) afzonderlijk aanvinkbaar
+4. **Formaatkeuze** — PDF of JSON toggle; exporteer-knop uitgeschakeld als niets geselecteerd
+5. **exportPDFFiltered()** — Bouwt alleen geselecteerde secties; klantnaam + datum in header; page-break tussen elke sectie; Persona's als opgemaakte kaartjes
+6. **exportJSONFiltered()** — Filtert analyse-object op geselecteerde secties; aiSwot meegegeven bij SWOT-selectie
+7. **DashboardScreen** — Split-knop (PDF + ▾ dropdown) vervangen door één "Exporteer"-knop; `showExportMenu`/`exportMenuRef` verwijderd
+
+### Sessie 2026-03-23 — 4 grote uitbreidingen
+
+#### 1. Teamstructuur invoerflow
+1. **emptyTeamlid** — Nieuw datashape `{naam, functietitel, rol, isLeader}` per teamlid
+2. **TeamEditor component** — Gestructureerd formulier met "Voeg teamlid toe"-knop; max 10 leden; checkbox per lid voor teamleader-aanwijzing; verwijderknop
+3. **OrgChart redesign** — Leider bovenaan met naam + functietitel (donkere bubbel); rest in rij eronder; rol als klein grijs label rechts van elke bubbel; SVG verbindingslijnen; gestippelde lijn naar beslissingsproces-blok; backward-compat fallback naar oude tekstvelden
+4. **Migratie** — `migrateAnalysis()` behoudt `teamleden` array bij herlaad van oude opgeslagen data
+
+#### 2. Concurrentieanalyse radardiagram
+5. **scoreTextVeld()** — Scoort tekstveld 1–5 op basis van positieve/negatieve sleutelwoorden
+6. **erToRadarScore()** — Converteert ER-percentage naar score 1–5
+7. **ConcurrentieRadar** — SVG penta-radardiagram (5 assen: positionering, content, community, engagement, differentiatie); kleurlijn per concurrent; legende + toelichting; boven de bestaande vergelijkingstabel
+
+#### 3. Samenvattingspagina uitbreiding
+8. **Benchmark ER** — In de ER-kaart: pijl omhoog (groen) of omlaag (oranje) met "Beste concurrent: X%" wanneer concurrent ER beschikbaar
+9. **Marktcontext sectie** — Na doelgroep-kaart: twee kleurgecodeerde badges (groeiend/verzadigd/krimpend/stabiel) voor marktgrootte en marktverzadiging
+10. **Middelen sectie** — Na marktcontext: budget en tijd als kaartjes; oranje waarschuwing onder €500/maand of onder 5 uur/week
+
+#### 4. Sectiegezondheidsscores
+11. **computeSectionHealth()** — Telt positieve vs totale badges in een sectie
+12. **SectionHealthBadge component** — Toont "X/Y" badge naast sectietitel; groen als alles positief, rood als alles negatief, oranje anders
+13. **Badges toegevoegd aan** — Alle 9 interne en externe dashboard-secties: Merkidentiteit, Kanaalstrategie, Doelgroep, Strategische content, Community, Concurrentie, Samenwerkingen, Markt/Scene, Doelgroepgedrag, Culturele trends
 
 ### Commit 38f8d22 — SWOT vergelijking visueel verbeterd
 1. **Vergelijkingskaartjes** — Elk verschil in een eigen afgebakend kaartje met titel en bodytekst
@@ -47,12 +81,12 @@
 
 ### Features actief
 - Multi-client analyse beheer (aanmaken, opslaan, openen, verwijderen)
-- PDF export (print-dialoog) + JSON export/import
-- Samenvattingspagina: gezondheidscore A–F, mini-donut contentmix, doelgroep compact, persona snellinks
-- Interne analyse: Organisatie (SVG OrgChart), Merkidentiteit, Kanalen, Doelgroep, Content, Strategie, Community, Middelen, SWOT
-- Externe analyse: Concurrentie (multi + frequentie/performance per concurrent), Samenwerkingen, Markt/Scene, Doelgroepgedrag, Trends
-- Dashboard: badges + tooltips, IconDataCards, tag-chips, SVG organogram, performance metrics
-- Visueel: donut contentmix, format-balken, doelgroep vergelijking, community score-meter
+- Export modal: selecteerbare secties (samenvatting, interne/externe/persona's/individueel), PDF of JSON formaat
+- Samenvattingspagina: gezondheidscore A–F, mini-donut contentmix, doelgroep compact, persona snellinks, benchmark ER (concurrent vergelijking), marktcontext badges, middelen kaartjes
+- Interne analyse: Organisatie (SVG OrgChart + TeamEditor), Merkidentiteit, Kanalen, Doelgroep, Content, Strategie, Community, Middelen, SWOT
+- Externe analyse: Concurrentie (radardiagram + vergelijkingstabel), Samenwerkingen, Markt/Scene, Doelgroepgedrag, Trends
+- Dashboard: badges + tooltips, IconDataCards, tag-chips, SVG organogram, performance metrics, sectiegezondheidsscores (X/Y)
+- Visueel: donut contentmix, format-balken, doelgroep vergelijking, community score-meter, penta-radardiagram concurrenten
 - Automatische inzichten: 9 data-verbindingen, 3 kleurtypen, teller bovenaan
 - Engagement rate: uitsluitend automatisch berekend (Insights/bereik of publiek/volgers)
 - Concurrent ER: automatisch via publieke formule (likes + comments) / volgers
