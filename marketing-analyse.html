@@ -29,7 +29,7 @@
     // ─── Data structure ───────────────────────────────────────────────────────
     const emptyFormat = () => ({ count: '', uitleg: '', voorbeelden: '' });
     const emptyCompetitor = () => ({ naam: '', positionering: '', branding: '', content: '', community: '', postsAantal: '', storiesAantal: '', engagementLikes: '', engagementComments: '', engagementShares: '', engagementVolgers: '', differentiatie: '', watDoenZijNiet: '' });
-    const emptyTeamlid = () => ({ naam: '', functietitel: '', rol: '', isLeader: false });
+    const emptyTeamlid = () => ({ naam: '', functietitel: '', rol: '', isLeader: false, rapporteertAan: '' });
 
     const emptyData = () => ({
       interneAnalyse: {
@@ -116,7 +116,7 @@
         interneAnalyse: {
           ...base.interneAnalyse,
           ...int,
-          organisatie: { ...base.interneAnalyse.organisatie, ...(int.organisatie || {}), teamleden: Array.isArray(int.organisatie?.teamleden) ? int.organisatie.teamleden : [] },
+          organisatie: { ...base.interneAnalyse.organisatie, ...(int.organisatie || {}), teamleden: Array.isArray(int.organisatie?.teamleden) ? int.organisatie.teamleden.map(m => ({ rapporteertAan: '', ...m })) : [] },
           kanaalstrategie: { ...base.interneAnalyse.kanaalstrategie, ...(int.kanaalstrategie || {}) },
           contentanalyse: migratedCa,
         },
@@ -717,9 +717,16 @@ ${parts.join('\n')}</body></html>`;
       );
     }
 
-    function DCard({ title, letter, children }) {
+    function DCard({ title, letter, children, onClick }) {
+      const clickable = !!onClick;
       return (
-        <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm mb-4">
+        <div
+          className={`bg-white border border-gray-100 rounded-xl p-5 shadow-sm mb-4 relative ${clickable ? 'cursor-pointer hover:border-gray-300 hover:shadow-md transition-all group' : ''}`}
+          onClick={onClick}
+          role={clickable ? 'button' : undefined}
+          tabIndex={clickable ? 0 : undefined}
+          onKeyDown={clickable ? (e => { if (e.key === 'Enter' || e.key === ' ') onClick(); }) : undefined}
+        >
           {(title || letter) && (
             <div className="flex items-baseline gap-2 mb-4 pb-3 border-b border-gray-50">
               {letter && <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">{letter}</span>}
@@ -727,6 +734,7 @@ ${parts.join('\n')}</body></html>`;
             </div>
           )}
           {children}
+          {clickable && <span className="absolute bottom-3 right-3 text-xs text-gray-300 group-hover:text-gray-500 transition-colors select-none">↗</span>}
         </div>
       );
     }
@@ -734,6 +742,7 @@ ${parts.join('\n')}</body></html>`;
       title: PropTypes.string,
       letter: PropTypes.string,
       children: PropTypes.node,
+      onClick: PropTypes.func,
     };
 
     // SWOT 2×2 grid
@@ -1019,11 +1028,26 @@ ${parts.join('\n')}</body></html>`;
     // without needing to read the content — pre-attentive visual encoding via color + position
     const INSIGHT_TYPE_LABELS = { tension: 'Spanningsveld', opportunity: 'Kans', urgent: 'Urgent' };
 
-    function InsightCard({ insight }) {
+    const _INTERNE_IDS = new Set(['organisatie','merkidentiteit','kanaalstrategie','doelgroep','contentanalyse','strategisch','community','middelen','swot']);
+    const _EXTERNE_IDS = new Set(['concurrentie','samenwerkingen','markt','doelgroepgedrag','trends']);
+    function pageToNav(pageId) {
+      if (_INTERNE_IDS.has(pageId)) return { main: 'interne', sub: pageId };
+      if (_EXTERNE_IDS.has(pageId)) return { main: 'externe', sub: pageId };
+      return null;
+    }
+
+    function InsightCard({ insight, onNavigate }) {
       const c = INSIGHT_COLORS[insight.type] || INSIGHT_COLORS.opportunity;
+      const nav = insight.pages && insight.pages.length ? pageToNav(insight.pages[0]) : null;
+      const clickable = !!(onNavigate && nav);
+      const handleClick = () => { if (clickable) onNavigate(nav); };
       return (
-        <div className={`rounded-xl border ${c.border} overflow-hidden flex`}>
-          {/* Left color stripe: encodes urgency type pre-attentively via color + thickness */}
+        <div
+          className={`rounded-xl border ${c.border} overflow-hidden flex ${clickable ? 'cursor-pointer hover:shadow-md transition-shadow group' : ''}`}
+          onClick={clickable ? handleClick : undefined}
+          role={clickable ? 'button' : undefined}
+          tabIndex={clickable ? 0 : undefined}
+        >
           <div className={`w-1 shrink-0 ${c.stripe}`} />
           <div className={`flex-1 p-4 ${c.bg}`}>
             <div className="flex items-start gap-3">
@@ -1034,6 +1058,7 @@ ${parts.join('\n')}</body></html>`;
                   <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ml-auto shrink-0 ${c.tag}`}>
                     {INSIGHT_TYPE_LABELS[insight.type] || insight.type}
                   </span>
+                  {clickable && <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors shrink-0">↗</span>}
                 </div>
                 <p className={`text-xs leading-relaxed ${c.text}`}>{insight.text}</p>
               </div>
@@ -1066,7 +1091,7 @@ ${parts.join('\n')}</body></html>`;
       insights: PropTypes.array,
     };
 
-    function InzichtenBlok({ insights, title = 'Automatische inzichten' }) {
+    function InzichtenBlok({ insights, title = 'Automatische inzichten', onNavigate }) {
       if (!insights || !insights.length) return null;
       const n = insights.length;
       const countBg = n >= 5 ? 'bg-red-100 text-red-600' : n >= 3 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-500';
@@ -1079,7 +1104,7 @@ ${parts.join('\n')}</body></html>`;
             </span>
           </div>
           <div className="space-y-3">
-            {insights.map(i => <InsightCard key={i.id} insight={i} />)}
+            {insights.map(i => <InsightCard key={i.id} insight={i} onNavigate={onNavigate} />)}
           </div>
         </DCard>
       );
@@ -1090,121 +1115,114 @@ ${parts.join('\n')}</body></html>`;
       const [activeIdx, setActiveIdx] = useState(null);
       const descRef = useRef(null);
 
-      // Resolve members: prefer teamleden array, fallback to old text parsing
+      // Resolve members
       let members = [];
       if (Array.isArray(teamleden) && teamleden.some(m => m.naam || m.functietitel)) {
         members = teamleden.filter(m => m.naam || m.functietitel);
       } else if (team) {
         const parsed = String(team).split(/[,\n]+/).map(m => m.trim()).filter(Boolean);
-        members = parsed.map((n, i) => ({ naam: n, functietitel: '', rol: '', isLeader: i === 0 }));
+        members = parsed.map((n, i) => ({ naam: n, functietitel: '', rol: '', isLeader: i === 0, rapporteertAan: '' }));
       }
 
       const hasData = members.length > 0 || werking;
       if (!hasData) return <p className="text-sm text-gray-300 italic text-center py-3">—</p>;
 
-      const leaderIdx = members.findIndex(m => m.isLeader);
-      const leader = leaderIdx >= 0 ? members[leaderIdx] : members[0];
-      const rest = members.filter(m => m !== leader);
-      const restCount = rest.length;
-      const leaderOrigIdx = members.indexOf(leader);
-      const restOrigIdxs = rest.map(m => members.indexOf(m));
-
-      const handleNodeClick = (origIdx) => {
-        setActiveIdx(origIdx);
-        setTimeout(() => {
-          if (descRef.current) descRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 60);
+      const handleNodeClick = (idx) => {
+        setActiveIdx(idx);
+        setTimeout(() => { if (descRef.current) descRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 60);
       };
 
-      // Compact bubbels — scaled via viewBox so ze altijd op pagina passen
-      const NW = 90, NH = 42, H_GAP = 6, VGAP = 34, TOP = 8;
-      const totalRestW = restCount > 0 ? restCount * NW + Math.max(0, restCount - 1) * H_GAP : 0;
-      const svgW = Math.max(NW + 20, totalRestW + 20);
-      const cx = svgW / 2;
-      const leadX = cx - NW / 2;
-      const leadY = TOP;
-      const hBarY = leadY + NH + Math.floor(VGAP / 2);
-      const restY = leadY + NH + VGAP;
-      const restStartX = restCount > 0 ? (svgW - totalRestW) / 2 : 0;
-      const treeH = restCount > 0 ? restY + NH + TOP + 4 : leadY + NH + TOP + 4;
+      const hasDescriptions = members.some(m => m.rol);
       const trunc = (s, max) => !s ? '' : s.length > max ? s.slice(0, max - 1) + '…' : s;
 
-      const hasDescriptions = members.some(m => m.rol);
+      // ── Tree layout ────────────────────────────────────────────────────────
+      const NW = 90, NH = 42, H_GAP = 10, VGAP = 48, TOP = 8, PAD = 10;
+
+      // Build parent→children map from rapporteertAan
+      const nameToIdx = {};
+      members.forEach((m, i) => { if (m.naam) nameToIdx[m.naam] = i; });
+      const childrenOf = Array.from({ length: members.length }, () => []);
+      const hasParent = new Array(members.length).fill(false);
+      members.forEach((m, i) => {
+        if (m.rapporteertAan && nameToIdx[m.rapporteertAan] !== undefined && nameToIdx[m.rapporteertAan] !== i) {
+          const pi = nameToIdx[m.rapporteertAan];
+          childrenOf[pi].push(i);
+          hasParent[i] = true;
+        }
+      });
+
+      // Roots: members with no parent
+      let roots = members.map((_, i) => i).filter(i => !hasParent[i]);
+      if (roots.length === 0) roots = [0]; // cycle safeguard
+
+      // Compute positions (Reingold-Tilford-like leaf assignment)
+      const positions = new Array(members.length);
+      let leafX = 0;
+      const computePos = (idx, depth) => {
+        if (childrenOf[idx].length === 0) {
+          positions[idx] = { x: leafX, depth };
+          leafX++;
+        } else {
+          childrenOf[idx].forEach(c => computePos(c, depth + 1));
+          const f = childrenOf[idx][0], l = childrenOf[idx][childrenOf[idx].length - 1];
+          positions[idx] = { x: (positions[f].x + positions[l].x) / 2, depth };
+        }
+      };
+      roots.forEach(r => computePos(r, 0));
+      // Position any unresolved nodes (cycles)
+      members.forEach((_, i) => { if (!positions[i]) { positions[i] = { x: leafX, depth: 0 }; leafX++; } });
+
+      const leafCount = Math.max(leafX, 1);
+      const maxDepth = Math.max(...positions.map(p => p.depth));
+
+      const svgW = leafCount * (NW + H_GAP) - H_GAP + PAD * 2;
+      const svgH = (maxDepth + 1) * (NH + VGAP) - VGAP + TOP * 2;
+
+      const nx  = i => PAD + positions[i].x * (NW + H_GAP);
+      const ncx = i => nx(i) + NW / 2;
+      const ny  = i => TOP + positions[i].depth * (NH + VGAP);
+
+      const isLeaderNode = i => members[i].isLeader || (!members.some(m => m.isLeader) && roots.includes(i));
 
       return (
         <div>
-          {/* SVG organogram — viewBox zorgt dat het altijd past zonder scroll */}
-          <svg
-            viewBox={`0 0 ${svgW} ${treeH}`}
-            width="100%" preserveAspectRatio="xMidYMid meet"
-            style={{ display: 'block', overflow: 'visible' }}
-          >
-            {/* Leader node */}
-            {leader && (
-              <g onClick={() => handleNodeClick(leaderOrigIdx)} style={{ cursor: 'pointer' }}>
-                <rect
-                  x={leadX} y={leadY} width={NW} height={NH} rx="8"
-                  fill={activeIdx === leaderOrigIdx ? '#1d4ed8' : '#111827'}
-                  stroke={activeIdx === leaderOrigIdx ? '#3b82f6' : 'none'}
-                  strokeWidth="2"
-                />
-                {leader.functietitel
-                  ? <>
-                      <text x={cx} y={leadY + 14} textAnchor="middle" fill="#9ca3af" fontSize="7" fontWeight="700" letterSpacing="0.07em">
-                        {trunc(leader.functietitel.toUpperCase(), 14)}
-                      </text>
-                      <text x={cx} y={leadY + 30} textAnchor="middle" fill="white" fontSize="11" fontWeight="600">
-                        {trunc(leader.naam || 'Teamleader', 13)}
-                      </text>
-                    </>
-                  : <text x={cx} y={leadY + 25} textAnchor="middle" fill="white" fontSize="11" fontWeight="600">
-                      {trunc(leader.naam || 'Teamleader', 13)}
-                    </text>
-                }
-                <title>{[leader.naam, leader.functietitel].filter(Boolean).join(' · ')}</title>
-              </g>
+          <svg viewBox={`0 0 ${svgW} ${svgH}`} width="100%" preserveAspectRatio="xMidYMid meet"
+            style={{ display: 'block', overflow: 'visible' }}>
+            {/* Curved connection lines parent → child */}
+            {members.map((_, pi) =>
+              childrenOf[pi].map(ci => {
+                const px = ncx(pi), py = ny(pi) + NH;
+                const cx = ncx(ci), cy = ny(ci);
+                const my = (py + cy) / 2;
+                return <path key={`${pi}-${ci}`} d={`M ${px} ${py} C ${px} ${my}, ${cx} ${my}, ${cx} ${cy}`}
+                  fill="none" stroke="#d1d5db" strokeWidth="1.5" />;
+              })
             )}
-
-            {/* Verticale lijn omlaag */}
-            {leader && restCount > 0 && (
-              <line x1={cx} y1={leadY + NH} x2={cx} y2={hBarY} stroke="#d1d5db" strokeWidth="1.5" />
-            )}
-
-            {/* Horizontale balk */}
-            {restCount > 1 && (
-              <line
-                x1={restStartX + NW / 2} y1={hBarY}
-                x2={restStartX + (restCount - 1) * (NW + H_GAP) + NW / 2} y2={hBarY}
-                stroke="#d1d5db" strokeWidth="1.5"
-              />
-            )}
-
-            {/* Teamlid bubbels */}
-            {rest.map((m, i) => {
-              const origIdx = restOrigIdxs[i];
-              const nx = restStartX + i * (NW + H_GAP);
-              const midX = nx + NW / 2;
-              const isActive = activeIdx === origIdx;
+            {/* Nodes */}
+            {members.map((m, i) => {
+              const nodeX = nx(i), nodeY = ny(i), cx = ncx(i);
+              const leader = isLeaderNode(i);
+              const active = activeIdx === i;
               return (
-                <g key={i} onClick={() => handleNodeClick(origIdx)} style={{ cursor: 'pointer' }}>
-                  <line x1={midX} y1={hBarY} x2={midX} y2={restY} stroke="#d1d5db" strokeWidth="1.5" />
-                  <rect
-                    x={nx} y={restY} width={NW} height={NH} rx="7"
-                    fill={isActive ? '#eff6ff' : 'white'}
-                    stroke={isActive ? '#3b82f6' : '#374151'}
-                    strokeWidth={isActive ? '2' : '1.5'}
-                  />
+                <g key={i} onClick={() => handleNodeClick(i)} style={{ cursor: 'pointer' }}>
+                  <rect x={nodeX} y={nodeY} width={NW} height={NH} rx={leader ? 8 : 7}
+                    fill={leader ? (active ? '#1d4ed8' : '#111827') : (active ? '#eff6ff' : 'white')}
+                    stroke={active ? '#3b82f6' : (leader ? 'none' : '#374151')}
+                    strokeWidth={active ? '2' : '1.5'} />
                   {m.functietitel
                     ? <>
-                        <text x={midX} y={restY + 14} textAnchor="middle" fill="#9ca3af" fontSize="7" fontWeight="600" letterSpacing="0.06em">
+                        <text x={cx} y={nodeY + 14} textAnchor="middle" fill="#9ca3af" fontSize="7"
+                          fontWeight={leader ? '700' : '600'} letterSpacing="0.07em">
                           {trunc(m.functietitel.toUpperCase(), 14)}
                         </text>
-                        <text x={midX} y={restY + 30} textAnchor="middle" fill="#111827" fontSize="11" fontWeight="500">
-                          {trunc(m.naam || '—', 13)}
+                        <text x={cx} y={nodeY + 30} textAnchor="middle" fill={leader ? 'white' : '#111827'}
+                          fontSize="11" fontWeight={leader ? '600' : '500'}>
+                          {trunc(m.naam || (leader ? 'Teamleader' : '—'), 13)}
                         </text>
                       </>
-                    : <text x={midX} y={restY + 25} textAnchor="middle" fill="#111827" fontSize="11" fontWeight="500">
-                        {trunc(m.naam || '—', 13)}
+                    : <text x={cx} y={nodeY + 25} textAnchor="middle" fill={leader ? 'white' : '#111827'}
+                        fontSize="11" fontWeight={leader ? '600' : '500'}>
+                        {trunc(m.naam || (leader ? 'Teamleader' : '—'), 13)}
                       </text>
                   }
                   <title>{[m.naam, m.functietitel].filter(Boolean).join(' · ')}</title>
@@ -1213,7 +1231,7 @@ ${parts.join('\n')}</body></html>`;
             })}
           </svg>
 
-          {/* Beslissingsproces — aparte stijl, gestippelde lijn, duidelijk onderscheiden */}
+          {/* Beslissingsproces */}
           {werking && (
             <div className="flex flex-col items-center mt-1">
               <div className="w-px h-5" style={{ borderLeft: '2px dashed #93c5fd' }} />
@@ -1238,25 +1256,18 @@ ${parts.join('\n')}</body></html>`;
             </div>
           )}
 
-          {/* Functiebeschrijvingen sectie — scroll doel bij klik op bubbel */}
+          {/* Functiebeschrijvingen sectie */}
           {hasDescriptions && (
             <div ref={descRef} className="mt-4 pt-3 border-t border-gray-100">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Functiebeschrijvingen</p>
               <div className="space-y-2">
-                {members.map((m, origIdx) => {
+                {members.map((m, i) => {
                   if (!m.rol) return null;
-                  const isActive = activeIdx === origIdx;
+                  const active = activeIdx === i;
                   return (
-                    <div
-                      key={origIdx}
-                      className={`rounded-xl p-3 border transition-all duration-150 ${
-                        isActive ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-100 bg-white'
-                      }`}
-                    >
+                    <div key={i} className={`rounded-xl p-3 border transition-all duration-150 ${active ? 'border-blue-400 bg-blue-50 shadow-sm' : 'border-gray-100 bg-white'}`}>
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        {m.isLeader && (
-                          <span className="text-xs bg-gray-900 text-white px-2 py-0.5 rounded-full shrink-0">Teamleader</span>
-                        )}
+                        {m.isLeader && <span className="text-xs bg-gray-900 text-white px-2 py-0.5 rounded-full shrink-0">Teamleader</span>}
                         <p className="text-xs font-semibold text-gray-800">{m.naam || '—'}</p>
                         {m.functietitel && <span className="text-xs text-gray-400">· {m.functietitel}</span>}
                       </div>
@@ -1334,14 +1345,30 @@ ${parts.join('\n')}</body></html>`;
                       />
                     </div>
                   </div>
-                  <div className="mb-3">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Rol / verantwoordelijkheid</label>
-                    <input
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                      value={m.rol}
-                      onChange={e => update(i, 'rol', e.target.value)}
-                      placeholder="Korte beschrijving van de rol"
-                    />
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Rol / verantwoordelijkheid</label>
+                      <input
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        value={m.rol}
+                        onChange={e => update(i, 'rol', e.target.value)}
+                        placeholder="Korte beschrijving van de rol"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Rapporteert aan</label>
+                      <select
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
+                        value={m.rapporteertAan || ''}
+                        onChange={e => update(i, 'rapporteertAan', e.target.value)}
+                      >
+                        <option value="">— Hoogste niveau —</option>
+                        {teamleden.map((other, j) => {
+                          if (j === i || !other.naam) return null;
+                          return <option key={j} value={other.naam}>{other.naam}{other.functietitel ? ` (${other.functietitel})` : ''}</option>;
+                        })}
+                      </select>
+                    </div>
                   </div>
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
@@ -1423,7 +1450,8 @@ ${parts.join('\n')}</body></html>`;
     }
 
     // ─── Concurrentie radar diagram ───────────────────────────────────────────
-    function ConcurrentieRadar({ data }) {
+    function ConcurrentieRadar({ data, analysis }) {
+      const [showOwn, setShowOwn] = useState(true);
       const list = Array.isArray(data) ? data : [data];
       const hasAny = list.some(c => c.naam);
       if (!hasAny) return null;
@@ -1432,6 +1460,7 @@ ${parts.join('\n')}</body></html>`;
       const N = AXES.length;
       const CX = 120, CY = 115, R = 85;
       const COLORS = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#f43f5e'];
+      const OWN_COLOR = '#e11d48';
 
       const angleFor = i => ((i * 360 / N) - 90) * Math.PI / 180;
       const pt = (i, r) => ({
@@ -1439,7 +1468,7 @@ ${parts.join('\n')}</body></html>`;
         y: +(CY + r * Math.sin(angleFor(i))).toFixed(2),
       });
 
-      const scores = list.map(c => [
+      const compScores = list.map(c => [
         scoreTextVeld(c.positionering),
         scoreTextVeld(c.content),
         scoreTextVeld(c.community),
@@ -1447,11 +1476,38 @@ ${parts.join('\n')}</body></html>`;
         scoreTextVeld(c.differentiatie),
       ]);
 
+      // Eigen merk scores op basis van analysedata
+      const ownScores = analysis ? (() => {
+        const int = analysis.interneAnalyse;
+        const ca = int.contentanalyse;
+        const commPct = computeCommunityScore(int.communityAnalyse);
+        return [
+          scoreTextVeld(int.merkidentiteit?.huidigePositionering),
+          scoreTextVeld(int.strategischeContent?.positioneringsconsistentie),
+          Math.max(1, Math.min(5, Math.ceil(commPct / 20))),
+          erToRadarScore(getEngagementRate(ca)),
+          scoreTextVeld(int.merkidentiteit?.toneOfVoice),
+        ];
+      })() : null;
+      const ownName = analysis?.klantnaam || 'Eigen merk';
+
       const svgW = CX * 2 + 10;
       const svgH = CY * 2 + 15;
 
       return (
         <div className="mb-6">
+          {/* Toggle eigen merk */}
+          {ownScores && (
+            <div className="flex justify-end mb-3">
+              <button
+                onClick={() => setShowOwn(v => !v)}
+                className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${showOwn ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: OWN_COLOR, opacity: showOwn ? 1 : 0.35 }} />
+                Toon eigen merk
+              </button>
+            </div>
+          )}
           <div className="flex justify-center overflow-x-auto">
             <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
               {/* Grid pentagons */}
@@ -1476,17 +1532,25 @@ ${parts.join('\n')}</body></html>`;
                   </text>
                 );
               })}
-              {/* Competitor polygons */}
-              {scores.map((score, ci) => {
+              {/* Concurrent polygons */}
+              {compScores.map((score, ci) => {
                 const pts = score.map((s, i) => { const p = pt(i, (s / 5) * R); return `${p.x},${p.y}`; }).join(' ');
                 const color = COLORS[ci % COLORS.length];
                 return (
                   <polygon key={ci} points={pts}
                     fill={color} fillOpacity="0.12"
-                    stroke={color} strokeWidth="2" strokeOpacity="0.85"
-                  />
+                    stroke={color} strokeWidth="2" strokeOpacity="0.85" />
                 );
               })}
+              {/* Eigen merk */}
+              {showOwn && ownScores && (() => {
+                const pts = ownScores.map((s, i) => { const p = pt(i, (s / 5) * R); return `${p.x},${p.y}`; }).join(' ');
+                return (
+                  <polygon points={pts}
+                    fill={OWN_COLOR} fillOpacity="0.10"
+                    stroke={OWN_COLOR} strokeWidth="2.5" strokeDasharray="5,3" strokeOpacity="0.9" />
+                );
+              })()}
             </svg>
           </div>
           {/* Legend */}
@@ -1497,6 +1561,12 @@ ${parts.join('\n')}</body></html>`;
                 <span className="text-xs text-gray-600">{c.naam}</span>
               </div>
             ))}
+            {showOwn && ownScores && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-0.5 shrink-0 rounded" style={{ backgroundColor: OWN_COLOR, borderTop: `2px dashed ${OWN_COLOR}`, display: 'inline-block' }} />
+                <span className="text-xs font-semibold" style={{ color: OWN_COLOR }}>{ownName}</span>
+              </div>
+            )}
           </div>
           <p className="text-xs text-gray-400 text-center mt-1.5 italic">Scores op basis van sleutelwoorden in tekstvelden (1–5). Engagement berekend via likes + comments / volgers.</p>
         </div>
@@ -2006,7 +2076,7 @@ ${parts.join('\n')}</body></html>`;
       );
     }
 
-    function PageConcurrentie({ data }) {
+    function PageConcurrentie({ data, analysis }) {
       // visualization-expert: mixed text+bar tables make numeric comparisons instantly scannable.
       // Inline bars added for Posts/week, Stories/week and ER rows — these are the only rows
       // with quantitative values suitable for length encoding. Text rows stay as text.
@@ -2058,7 +2128,7 @@ ${parts.join('\n')}</body></html>`;
           </div>
           {list.length > 0 && list[0].naam && (
             <DCard title="Vergelijkingsdiagram">
-              <ConcurrentieRadar data={list} />
+              <ConcurrentieRadar data={list} analysis={analysis} />
             </DCard>
           )}
           <div className="overflow-x-auto -mx-4 px-4">
@@ -2220,7 +2290,8 @@ ${parts.join('\n')}</body></html>`;
 
 
 // ─── Samenvatting page ────────────────────────────────────────────────────
-    function PageSamenvatting({ analysis, allInsights = [], personas, onNavigateToPersona }) {
+    function PageSamenvatting({ analysis, allInsights = [], personas, onNavigateToPersona, onNavigate }) {
+      const nav = (main, sub) => onNavigate && onNavigate({ main, sub });
       const { interneAnalyse: int, externeAnalyse: ext } = analysis;
       const ca = int.contentanalyse;
       const comm = int.communityAnalyse;
@@ -2327,11 +2398,11 @@ ${parts.join('\n')}</body></html>`;
       const ontbKanalen = (int.kanaalstrategie?.ontbrekendeKanalen || '').trim();
       const ontbSamenw  = (ext.samenwerkingen?.ontbrekendeSamenwerkingen || '').trim();
       const gaps = [];
-      if (communityPct < 50) gaps.push({ text: 'Community-opbouw vereist aandacht', type: 'warn' });
-      if (mismatch) gaps.push({ text: 'Kloof tussen gewenst en werkelijk publiek gedetecteerd', type: 'warn' });
-      if (reelsPct < 20 && erNum !== null && erNum < 5) gaps.push({ text: 'Reels onderbenut terwijl engagement laag is — overweeg meer videoformats', type: 'warn' });
-      if (ontbKanalen) gaps.push({ text: ontbKanalen, type: 'gap', label: 'Ontbrekende kanalen' });
-      if (ontbSamenw)  gaps.push({ text: ontbSamenw,  type: 'gap', label: 'Ontbrekende samenwerkingen' });
+      if (communityPct < 50) gaps.push({ text: 'Community-opbouw vereist aandacht', type: 'warn', nav: { main: 'interne', sub: 'community' } });
+      if (mismatch) gaps.push({ text: 'Kloof tussen gewenst en werkelijk publiek gedetecteerd', type: 'warn', nav: { main: 'interne', sub: 'doelgroep' } });
+      if (reelsPct < 20 && erNum !== null && erNum < 5) gaps.push({ text: 'Reels onderbenut terwijl engagement laag is — overweeg meer videoformats', type: 'warn', nav: { main: 'interne', sub: 'contentanalyse' } });
+      if (ontbKanalen) gaps.push({ text: ontbKanalen, type: 'gap', label: 'Ontbrekende kanalen', nav: { main: 'interne', sub: 'kanaalstrategie' } });
+      if (ontbSamenw)  gaps.push({ text: ontbSamenw,  type: 'gap', label: 'Ontbrekende samenwerkingen', nav: { main: 'externe', sub: 'samenwerkingen' } });
 
       // Persona snellinks
       const PERSONA_TYPES = [
@@ -2370,15 +2441,26 @@ ${parts.join('\n')}</body></html>`;
 
           {/* ── Key metrics ── */}
           <div className="grid grid-cols-2 gap-3">
-            <div className={`${commC.bg} border ${commC.border} rounded-xl p-4`}>
+            <div
+              className={`${commC.bg} border ${commC.border} rounded-xl p-4 relative cursor-pointer hover:shadow-md hover:border-opacity-70 transition-all group`}
+              onClick={() => nav('interne', 'community')}
+              role="button" tabIndex={0}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') nav('interne', 'community'); }}
+            >
               <div className="flex items-center gap-1 mb-2">
                 <p className="text-xs font-medium text-gray-500">Community score</p>
                 <Tooltip text="Onder 40% = publiek, 40–70% = actieve community, boven 70% = echte community." />
               </div>
               <p className={`text-3xl font-bold ${commC.text}`}>{communityPct}%</p>
               <p className={`text-xs font-semibold mt-1 ${commC.text}`}>{commLabel}</p>
+              <span className="absolute bottom-2 right-2 text-xs text-gray-300 group-hover:text-gray-500 transition-colors select-none">↗</span>
             </div>
-            <div className={`${erC.bg} border ${erC.border} rounded-xl p-4`}>
+            <div
+              className={`${erC.bg} border ${erC.border} rounded-xl p-4 relative cursor-pointer hover:shadow-md hover:border-opacity-70 transition-all group`}
+              onClick={() => nav('interne', 'contentanalyse')}
+              role="button" tabIndex={0}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') nav('interne', 'contentanalyse'); }}
+            >
               <div className="flex items-center gap-1 mb-2">
                 <p className="text-xs font-medium text-gray-500">Engagement rate</p>
                 <Tooltip text="Onder 2% = laag, 2–5% = gemiddeld, boven 5% = goed — industrie benchmark." />
@@ -2390,19 +2472,26 @@ ${parts.join('\n')}</body></html>`;
               {!erMissing && erC.label && <p className={`text-xs font-semibold mt-1 ${erC.text}`}>{erC.label}</p>}
               {!erMissing && erNote && <p className="text-xs text-gray-400 mt-1 italic">{erNote}</p>}
               {!erMissing && bestCompetitorEr !== null && (
-                <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-200 border-opacity-40">
+                <div
+                  className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-200 border-opacity-40 cursor-pointer"
+                  onClick={e => { e.stopPropagation(); nav('externe', 'concurrentie'); }}
+                  role="button" tabIndex={0}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); nav('externe', 'concurrentie'); } }}
+                >
                   <span className={`font-bold text-base leading-none ${erNum >= bestCompetitorEr ? 'text-emerald-500' : 'text-amber-500'}`}>
                     {erNum >= bestCompetitorEr ? '↑' : '↓'}
                   </span>
                   <p className="text-xs text-gray-500">Beste concurrent: <span className="font-semibold text-gray-700">{bestCompetitorEr.toFixed(2)}%</span></p>
+                  <span className="text-xs text-gray-300 ml-auto">↗</span>
                 </div>
               )}
+              <span className="absolute bottom-2 right-2 text-xs text-gray-300 group-hover:text-gray-500 transition-colors select-none">↗</span>
             </div>
           </div>
 
           {/* ── Contentmix ── */}
           {total > 0 && (
-            <DCard title="Contentmix">
+            <DCard title="Contentmix" onClick={() => nav('interne', 'contentanalyse')}>
               <MiniDonutChart data={ca} />
               {dominantLabel && (
                 <p className="text-xs text-gray-400 mt-3 text-center">
@@ -2415,7 +2504,7 @@ ${parts.join('\n')}</body></html>`;
 
           {/* ── Doelgroep ── */}
           {bothFilled && (
-            <DCard title="Doelgroep">
+            <DCard title="Doelgroep" onClick={() => nav('interne', 'doelgroep')}>
               <div className="flex gap-2 mb-2">
                 <div className="flex-1 rounded-lg px-3 py-2 bg-blue-50 border border-blue-100">
                   <p className="text-xs font-bold text-blue-500 uppercase tracking-wide mb-1">Gewenst</p>
@@ -2440,7 +2529,7 @@ ${parts.join('\n')}</body></html>`;
 
           {/* ── Marktcontext ── */}
           {(marktGrootteStr || marktverzadigingStr) && (
-            <DCard title="Marktcontext">
+            <DCard title="Marktcontext" onClick={() => nav('externe', 'markt')}>
               <div className="flex gap-2 flex-wrap">
                 {marktGrootteStr && grootteB && (
                   <div className={`flex-1 min-w-0 rounded-xl p-3 border ${grootteB.bg} ${grootteB.border}`}>
@@ -2462,7 +2551,7 @@ ${parts.join('\n')}</body></html>`;
 
           {/* ── Middelen ── */}
           {(budgetStr || tijdStr) && (
-            <DCard title="Middelen">
+            <DCard title="Middelen" onClick={() => nav('interne', 'middelen')}>
               <div className="grid grid-cols-2 gap-3">
                 {budgetStr && (
                   <div className={`rounded-xl p-3 border ${budgetWarn ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
@@ -2485,18 +2574,29 @@ ${parts.join('\n')}</body></html>`;
           {/* ── Gaps ── */}
           {gaps.length > 0 ? (
             <DCard title="Gedetecteerde gaps">
-              <div className="space-y-3">
-                {gaps.map((gap, i) => (
-                  <div key={i} className="flex gap-3 items-start">
-                    <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${gap.type === 'warn' ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
-                      {gap.type === 'warn' ? '!' : '→'}
-                    </span>
-                    <div>
-                      {gap.label && <p className="text-xs font-semibold text-gray-500 mb-0.5">{gap.label}</p>}
-                      <p className="text-sm text-gray-700 leading-relaxed">{gap.text}</p>
+              <div className="space-y-2">
+                {gaps.map((gap, i) => {
+                  const clickable = !!(gap.nav && onNavigate);
+                  return (
+                    <div
+                      key={i}
+                      className={`flex gap-3 items-start rounded-lg px-2 py-1.5 -mx-2 transition-colors ${clickable ? 'cursor-pointer hover:bg-gray-50 group' : ''}`}
+                      onClick={clickable ? () => onNavigate(gap.nav) : undefined}
+                      role={clickable ? 'button' : undefined}
+                      tabIndex={clickable ? 0 : undefined}
+                      onKeyDown={clickable ? (e => { if (e.key === 'Enter' || e.key === ' ') onNavigate(gap.nav); }) : undefined}
+                    >
+                      <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${gap.type === 'warn' ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-500'}`}>
+                        {gap.type === 'warn' ? '!' : '→'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        {gap.label && <p className="text-xs font-semibold text-gray-500 mb-0.5">{gap.label}</p>}
+                        <p className="text-sm text-gray-700 leading-relaxed">{gap.text}</p>
+                      </div>
+                      {clickable && <span className="text-xs text-gray-300 group-hover:text-gray-500 transition-colors self-center shrink-0 ml-1">↗</span>}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </DCard>
           ) : (
@@ -2505,7 +2605,7 @@ ${parts.join('\n')}</body></html>`;
             </div>
           )}
 
-          <InzichtenBlok insights={allInsights} />
+          <InzichtenBlok insights={allInsights} onNavigate={onNavigate} />
 
           {/* ── Persona snellinks ── */}
           <DCard title="Persona's">
@@ -3102,6 +3202,15 @@ ${parts.join('\n')}</body></html>`;
         window.scrollTo({ top: 0, behavior: 'smooth' });
       };
 
+      const handleNavigate = ({ main, sub }) => {
+        setMainTab(main);
+        if (sub) {
+          if (main === 'interne') setInterneTab(sub);
+          else if (main === 'externe') setExterneTab(sub);
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+
       const renderInternePage = () => {
         const pi = (id) => insights.filter(i => i.pages.includes(id));
         switch (interneTab) {
@@ -3120,7 +3229,7 @@ ${parts.join('\n')}</body></html>`;
 
       const renderExternePage = () => {
         switch (externeTab) {
-          case 'concurrentie':    return <PageConcurrentie data={ext.concurrentieanalyse} />;
+          case 'concurrentie':    return <PageConcurrentie data={ext.concurrentieanalyse} analysis={analysis} />;
           case 'samenwerkingen':  return <PageSamenwerkingen data={ext.samenwerkingen || {}} />;
           case 'markt':           return <PageMarkt data={ext.marktSceneAnalyse} />;
           case 'doelgroepgedrag': return <PageDoelgroepgedrag data={ext.doelgroepgedrag} />;
@@ -3206,7 +3315,7 @@ ${parts.join('\n')}</body></html>`;
 
           {/* Content */}
           <div className="max-w-2xl mx-auto px-4 py-6">
-            {mainTab === 'samenvatting' ? <PageSamenvatting analysis={analysis} allInsights={insights} personas={analysis.personas} onNavigateToPersona={(key) => { setMainTab('personas'); setTimeout(() => { const el = document.getElementById('persona-card-' + key); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 200); }} /> :
+            {mainTab === 'samenvatting' ? <PageSamenvatting analysis={analysis} allInsights={insights} personas={analysis.personas} onNavigate={handleNavigate} onNavigateToPersona={(key) => { setMainTab('personas'); setTimeout(() => { const el = document.getElementById('persona-card-' + key); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 200); }} /> :
              mainTab === 'interne'      ? renderInternePage() :
              mainTab === 'externe'      ? renderExternePage() :
              mainTab === 'personas'     ? <PagePersonas analysis={analysis} personas={analysis.personas} onUpdate={onUpdate} apiKey={apiKey} onSetApiKey={onSetApiKey} /> :

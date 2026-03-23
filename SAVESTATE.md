@@ -10,6 +10,33 @@
 
 ## Samenvatting recente wijzigingen
 
+### Sessie 2026-03-23 — 3 grote uitbreidingen
+
+#### 1. Samenvattingspagina — alles klikbaar
+- **DCard** — optionele `onClick` prop; hover:border-gray-300 + hover:shadow-md + ↗ pijl rechtsonder
+- **Community score kaart** → Community subtab (Interne Analyse)
+- **Engagement rate kaart** → Content subtab; benchmark-element (↑/↓) apart klikbaar → Concurrentie
+- **Contentmix** → Content subtab
+- **Doelgroep** → Doelgroep subtab
+- **Marktcontext** → Markt/Scene subtab (Externe Analyse)
+- **Middelen** → Middelen subtab
+- **Gaps** — elk gap-item individueel klikbaar met eigen navigatiebestemming
+- **Automatische inzichten** — elk InsightCard klikbaar naar eerste pagina in `pages[]`
+- **Persona snellinks** — reeds functioneel
+- **handleNavigate** in DashboardScreen; `setMainTab` + `setInterneTab`/`setExterneTab`
+
+#### 2. OrgChart — onbeperkte hiërarchische niveaus
+- **emptyTeamlid** — `rapporteertAan: ''` veld toegevoegd
+- **migrateAnalysis** — behoudt `rapporteertAan` bij herlaad van oude data
+- **OrgChart redesign** — tree-layout algoritme (Reingold-Tilford-like); curved SVG-paden van parent naar kinderen; elke node op de correcte diepte; cycle-safeguard; behoud donkere bubbel (isLeader) en gestippelde lijn beslissingsproces
+- **TeamEditor** — "Rapporteert aan" dropdown per teamlid (naast "Rol"); toont namen van andere teamleden
+
+#### 3. ConcurrentieRadar — toggle eigen merk
+- **Toggle knop** "Toon eigen merk" (default aan); rode gestippelde lijn + rose toggle-button
+- **Eigen merk scores**: Positionering = huidigePositionering; Content = positioneringsconsistentie; Community = communityScore/20; Engagement = ER; Differentiatie = toneOfVoice
+- **Legende** — eigen merk met gestippelde kleurlijn en klantnaam
+- **PageConcurrentie + DashboardScreen** — `analysis` prop doorgegeven aan radar
+
 ### Sessie 2026-03-23 — Export modal
 
 #### Exportfunctionaliteit herbouwd
