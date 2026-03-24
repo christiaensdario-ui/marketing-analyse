@@ -2,7 +2,7 @@
 
 ## Laatste opslag
 **Datum:** 2026-03-24
-**Commit hash:** *(zie hieronder na push)*
+**Commit hash:** `d362e5b`
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
 
