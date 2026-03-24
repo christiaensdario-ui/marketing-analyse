@@ -749,6 +749,51 @@
       border-radius:var(--radius-sm); font-size:13px; color:#b91c1c; margin:10px 0;
     }
 
+    /* ── Drag snap / hour highlight ─────────────────────────── */
+    .cal-hcell.drop-target {
+      background:rgba(59,130,246,.18) !important;
+      box-shadow:inset 0 1px 0 rgba(59,130,246,.45), inset 0 -1px 0 rgba(59,130,246,.45);
+      z-index:3;
+    }
+
+    /* ── Resize handle ───────────────────────────────────────── */
+    .cal-resize-handle {
+      position:absolute; bottom:2px; left:50%;
+      transform:translateX(-50%);
+      width:26px; height:4px;
+      background:rgba(0,0,0,.16); border-radius:2px;
+      cursor:ns-resize; z-index:10; flex-shrink:0;
+      transition:background .12s, width .12s;
+      pointer-events:all;
+    }
+    .cal-block:hover .cal-resize-handle {
+      background:rgba(0,0,0,.36); width:36px;
+    }
+
+    /* ── Resize tooltip ──────────────────────────────────────── */
+    #cal-resize-tip {
+      position:fixed; z-index:450;
+      background:#1e293b; color:#fff;
+      padding:4px 10px; border-radius:7px;
+      font-size:11px; font-weight:600;
+      pointer-events:none; white-space:nowrap;
+      display:none; box-shadow:0 2px 8px rgba(0,0,0,.25);
+    }
+
+    /* ── Resize feedback ─────────────────────────────────────── */
+    .cal-block.is-resizing { outline:2px solid var(--primary); z-index:8; }
+    .cal-block.is-resizing.has-conflict { outline-color:var(--red); }
+
+    /* ── Shake animation ─────────────────────────────────────── */
+    @keyframes cal-shake {
+      0%,100% { transform:translateX(0); }
+      20%     { transform:translateX(-5px); }
+      40%     { transform:translateX(5px); }
+      60%     { transform:translateX(-3px); }
+      80%     { transform:translateX(3px); }
+    }
+    .cal-block.is-shaking { animation:cal-shake .35s ease; }
+
     /* ── Toast ───────────────────────────────────────────────── */
     #toast-el {
       position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
@@ -1459,8 +1504,10 @@ function _checkOverlap(day, startH, dur, excludeId) {
 }
 
 // ─── Calendar view ────────────────────────────────────────────────────────────
-let _drag = null;
-let _popCtx = null;
+let _drag         = null;
+let _popCtx       = null;
+let _resizeState  = null;   // active resize operation
+let _pendingShake = null;   // blockId to shake after failed move dragend
 
 function _buildCalendar() {
   const t         = _today();
@@ -1533,7 +1580,7 @@ function _buildCalendar() {
     // Hour background cells
     let hcells = '';
     for (let h = 0; h < 24; h++) {
-      hcells += `<div class="cal-hcell${h % 2 === 0 ? '' : ' even'}" style="top:calc(${h}*var(--row-h))"></div>`;
+      hcells += `<div class="cal-hcell${h % 2 === 0 ? '' : ' even'}" data-h="${h}" style="top:calc(${h}*var(--row-h))"></div>`;
     }
 
     // Work shift
@@ -1560,6 +1607,7 @@ function _buildCalendar() {
         style="top:calc(${b.startHour}*var(--row-h));height:calc(${b.durationHours}*var(--row-h));border-left-color:${color};background:${color}1a">
         <div class="cal-block-name">${_esc(label)}</div>
         ${showTime ? `<div class="cal-block-time">${_floatToTime(b.startHour)}–${endT}</div>` : ''}
+        <div class="cal-resize-handle" data-resize-id="${b.id}"></div>
       </div>`;
     });
 
@@ -1628,6 +1676,16 @@ function _calGoToday() { _calWeekOff = 0; _render(); }
 function _calWeek(dir) { _calWeekOff += dir; _render(); }
 
 // ─── Drag & Drop ──────────────────────────────────────────────────────────────
+function _clearDropHighlight() {
+  document.querySelectorAll('.cal-hcell.drop-target').forEach(c => c.classList.remove('drop-target'));
+}
+
+function _highlightHour(body, hour) {
+  _clearDropHighlight();
+  const cell = body.querySelector(`.cal-hcell[data-h="${hour}"]`);
+  if (cell) cell.classList.add('drop-target');
+}
+
 function _initCalDragDrop() {
   // Category tiles → drag source
   document.querySelectorAll('.cat-tile[data-cat-id]').forEach(tile => {
@@ -1636,17 +1694,30 @@ function _initCalDragDrop() {
       e.dataTransfer.effectAllowed = 'copy';
       setTimeout(() => tile.classList.add('dragging'), 0);
     });
-    tile.addEventListener('dragend', () => tile.classList.remove('dragging'));
+    tile.addEventListener('dragend', () => {
+      tile.classList.remove('dragging');
+      _clearDropHighlight();
+    });
   });
 
   // Existing blocks → drag + click
   document.querySelectorAll('.cal-block[data-block-id]').forEach(blk => {
     blk.addEventListener('dragstart', e => {
+      if (_resizeState) { e.preventDefault(); return; }
       _drag = { type: 'block', blockId: blk.dataset.blockId };
       e.dataTransfer.effectAllowed = 'move';
       setTimeout(() => blk.classList.add('dragging'), 0);
     });
-    blk.addEventListener('dragend', () => blk.classList.remove('dragging'));
+    blk.addEventListener('dragend', () => {
+      blk.classList.remove('dragging');
+      _clearDropHighlight();
+      // Apply shake if this move was rejected
+      if (_pendingShake === blk.dataset.blockId) {
+        _pendingShake = null;
+        blk.classList.add('is-shaking');
+        blk.addEventListener('animationend', () => blk.classList.remove('is-shaking'), { once: true });
+      }
+    });
     blk.addEventListener('click', e => {
       e.stopPropagation();
       _showEditPopover(blk.dataset.blockId, e.clientX, e.clientY);
@@ -1667,25 +1738,111 @@ function _initCalDragDrop() {
       if (!_drag) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = _drag.type === 'cat' ? 'copy' : 'move';
+      const rect = body.getBoundingClientRect();
+      const rawH = (e.clientY - rect.top) / (body.offsetHeight / 24);
+      const hour = Math.max(0, Math.min(23, Math.round(rawH))); // snap to full hour
       body.classList.add('drag-over');
+      _highlightHour(body, hour);
     });
     body.addEventListener('dragleave', e => {
-      if (!e.relatedTarget || !body.contains(e.relatedTarget))
+      if (!e.relatedTarget || !body.contains(e.relatedTarget)) {
         body.classList.remove('drag-over');
+        _clearDropHighlight();
+      }
     });
     body.addEventListener('drop', e => {
       e.preventDefault();
       body.classList.remove('drag-over');
+      _clearDropHighlight();
       if (!_drag) return;
       const rect = body.getBoundingClientRect();
       const rawH = (e.clientY - rect.top) / (body.offsetHeight / 24);
-      const hour = Math.max(0, Math.min(23.5, Math.round(rawH * 2) / 2)); // snap 30min
+      const hour = Math.max(0, Math.min(23, Math.round(rawH))); // snap to full hour
       const day  = body.dataset.day;
       if (_drag.type === 'cat')   _showAddPopover(day, hour, _drag.catId, e.clientX, e.clientY);
       if (_drag.type === 'block') _moveBlock(_drag.blockId, day, hour);
       _drag = null;
     });
   });
+
+  // Init resize handles after all block listeners
+  _initResizeHandles();
+}
+
+// ─── Resize handles ───────────────────────────────────────────────────────────
+function _initResizeHandles() {
+  document.querySelectorAll('.cal-resize-handle[data-resize-id]').forEach(handle => {
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();   // prevent drag from starting
+      e.stopPropagation();
+      const blockId = handle.dataset.resizeId;
+      const blocks  = _lsGet(KEYS.blocks, []);
+      const b = blocks.find(bl => bl.id === blockId);
+      if (!b) return;
+      const blkEl = handle.closest('.cal-block[data-block-id]');
+      const body  = blkEl ? blkEl.closest('.cal-day-body[data-day]') : null;
+      if (!blkEl || !body) return;
+      _resizeState = {
+        blockId, day: b.day,
+        origDur: b.durationHours, origStart: b.startHour,
+        rowH: body.offsetHeight / 24,
+        startY: e.clientY,
+        blkEl, currentDur: b.durationHours, hasConflict: false,
+      };
+      blkEl.classList.add('is-resizing');
+      _updateResizeTip(e.clientX, e.clientY, b.startHour, b.durationHours);
+      document.addEventListener('mousemove', _doResize);
+      document.addEventListener('mouseup',   _endResize);
+    });
+  });
+}
+
+function _updateResizeTip(x, y, startH, dur) {
+  const tip = document.getElementById('cal-resize-tip');
+  if (!tip) return;
+  const endH   = startH + dur;
+  const durTxt = dur >= 1 ? dur + 'u' : Math.round(dur * 60) + ' min';
+  tip.textContent = _floatToTime(startH) + ' – ' + _floatToTime(endH) + ' (' + durTxt + ')';
+  tip.style.display = 'block';
+  tip.style.left    = (x + 16) + 'px';
+  tip.style.top     = Math.max(8, y - 36) + 'px';
+}
+
+function _doResize(e) {
+  if (!_resizeState) return;
+  const { startY, rowH, origDur, origStart, blockId, day, blkEl } = _resizeState;
+  const deltaH = (e.clientY - startY) / rowH;
+  const newDur = Math.max(0.5, Math.round((origDur + deltaH) * 2) / 2); // 30-min snap
+  _resizeState.currentDur = newDur;
+  const conflict = _checkOverlap(day, origStart, newDur, blockId);
+  _resizeState.hasConflict = conflict;
+  blkEl.style.height = `calc(${newDur} * var(--row-h))`;
+  blkEl.classList.toggle('has-conflict', conflict);
+  _updateResizeTip(e.clientX, e.clientY, origStart, newDur);
+}
+
+function _endResize(e) {
+  if (!_resizeState) return;
+  document.removeEventListener('mousemove', _doResize);
+  document.removeEventListener('mouseup',   _endResize);
+  const tip = document.getElementById('cal-resize-tip');
+  if (tip) tip.style.display = 'none';
+  const { blockId, origDur, origStart, day, blkEl, currentDur, hasConflict } = _resizeState;
+  _resizeState = null;
+  blkEl.classList.remove('is-resizing', 'has-conflict');
+  if (!hasConflict && currentDur !== origDur) {
+    // Valid resize → save
+    const blocks = _lsGet(KEYS.blocks, []);
+    const b = blocks.find(bl => bl.id === blockId);
+    if (b) { b.durationHours = currentDur; _lsSet(KEYS.blocks, blocks); }
+    _render();
+  } else if (currentDur !== origDur) {
+    // Invalid → snap back + shake
+    blkEl.style.height = `calc(${origDur} * var(--row-h))`;
+    blkEl.classList.add('is-shaking');
+    blkEl.addEventListener('animationend', () => blkEl.classList.remove('is-shaking'), { once: true });
+    showToast('⚠️ Kan niet verkleinen — overlapt met blok of shift');
+  }
 }
 
 // ─── Popover ──────────────────────────────────────────────────────────────────
@@ -1826,7 +1983,8 @@ function _moveBlock(blockId, day, startHour) {
   const b = blocks.find(bl => bl.id === blockId);
   if (!b) return;
   if (_checkOverlap(day, startHour, b.durationHours, blockId)) {
-    showToast('⚠️ Kan niet verplaatsen — overlapt met bestaand blok of shift');
+    // Schedule shake — applied in dragend handler
+    _pendingShake = blockId;
     return;
   }
   b.day = day;
@@ -2285,5 +2443,6 @@ _init();
   <div class="ai-loading-sub">Dit duurt even — even geduld</div>
 </div>
 <div id="ai-overlay" class="hidden"></div>
+<div id="cal-resize-tip"></div>
 </body>
 </html>
