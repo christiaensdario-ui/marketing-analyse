@@ -859,11 +859,13 @@ let _obNewBlockId = null;
 
 // Wizard state — reset on each new planning
 let _w = {
-  step:        1,
-  shifts:      {},    // ISO → { startHour, endHour, label }
-  catState:    {},    // id  → { enabled, weeklyFrequency, durationHours, notes }
-  customCats:  [],    // [{ id, name, color, weeklyFrequency, durationHours, notes }]
-  editingDate: null,
+  step:           1,
+  shifts:         {},    // ISO → { startHour, endHour, label }
+  catState:       {},    // id  → { enabled, weeklyFrequency, durationHours, notes }
+  customCats:     [],    // [{ id, name, color, weeklyFrequency, durationHours, notes }]
+  editingDate:    null,
+  bufferHours:    1,
+  aiInstructions: '',
 };
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
@@ -1242,6 +1244,26 @@ function _buildStep3() {
         ${totalHoursWeek > 0 ? `<div class="overview-total">Totaal: ~${totalHoursWeek.toFixed(1)} uur per week</div>` : ''}
       </div>
 
+      <div class="overview-card">
+        <div class="overview-title">⚙️ AI-instellingen</div>
+        <div class="overview-row" style="flex-direction:column;align-items:flex-start;gap:10px">
+          <label style="display:flex;align-items:center;gap:10px;font-size:14px;width:100%">
+            <span style="white-space:nowrap">Buffertijd per dag</span>
+            <input type="number" min="0" max="8" step="0.5" value="${_w.bufferHours}"
+              oninput="_w.bufferHours = +this.value"
+              style="width:64px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg-card);color:var(--text)">
+            <span style="color:var(--text-muted)">uur</span>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:14px;width:100%">
+            <span>Extra instructies voor de AI <span style="color:var(--text-muted)">(optioneel)</span></span>
+            <textarea rows="3" placeholder="Bijv. 'Plan sport altijd in de ochtend' of 'Geen blokken op vrijdagavond'…"
+              oninput="_w.aiInstructions = this.value"
+              style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;resize:vertical;background:var(--bg-card);color:var(--text);box-sizing:border-box"
+            >${_esc(_w.aiInstructions)}</textarea>
+          </label>
+        </div>
+      </div>
+
       <button class="big-btn big-btn-ai" id="btn-ai-plan" onclick="_startAIPlanning()">
         ✨ Genereer AI planning
       </button>
@@ -1267,16 +1289,21 @@ function _saveWizardToStorage() {
         weeklyFrequency: cs.weeklyFrequency, durationHours: cs.durationHours, notes: cs.notes || '' };
     });
   _lsSet(KEYS.categories, cats);
-  _lsSet(KEYS.settings, { bufferHours: 1, planningHorizonWeeks: 2 });
+  _lsSet(KEYS.settings, {
+    bufferHours:       _w.bufferHours,
+    aiInstructions:    _w.aiInstructions,
+    planningHorizonWeeks: 2,
+  });
 }
 
 function _buildAIPayload() {
   const today = _today();
   const allCats = [...DEFAULT_CATS, ..._w.customCats];
   return {
-    planningStart: _toISO(today),
-    planningEnd:   _toISO(_addDays(today, 13)),
-    bufferHours: 1,
+    planningStart:  _toISO(today),
+    planningEnd:    _toISO(_addDays(today, 13)),
+    bufferHours:    _w.bufferHours,
+    aiInstructions: _w.aiInstructions || undefined,
     workShifts: Object.entries(_w.shifts).map(([date, s]) => ({
       date, startHour: s.startHour, endHour: s.endHour, label: s.label || 'Werkblok',
     })),
@@ -1318,6 +1345,8 @@ async function _startAIPlanning() {
   } catch (e) {
     console.error('[WeekFlow] AI planning fout:', e);
     showToast('AI is even niet beschikbaar — je kan zelf plannen');
+    _screen = 'calendar';
+    _render();
   } finally {
     _setAIButtonLoading(false);
     document.getElementById('ai-loading')?.classList.add('hidden');
@@ -1334,6 +1363,7 @@ async function _callAnthropicAPI(payload) {
     '3. Respecteer de weekfrequentie per categorie\n' +
     '4. Plan nooit meer dan 80% van de vrije tijd vol\n' +
     '5. Gebruik de notities per categorie als context voor slimme planning\n' +
+    '6. Als het veld aiInstructions aanwezig is in de invoer, respecteer die instructies strikt\n' +
     'Geef je output als een JSON array zonder extra tekst of markdown. ' +
     'Elk blok heeft: { date (YYYY-MM-DD), startHour (0-23), durationHours (0.5 stappen), ' +
     'category, name, isStudySession (bool), sessionNumber (1-4 of null) }';
