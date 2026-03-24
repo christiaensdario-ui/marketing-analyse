@@ -2,13 +2,46 @@
 
 ## Laatste opslag
 **Datum:** 2026-03-24
-**Commit hash:** 377ffaa
+**Commit hash:** deb74f0
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
+**Gepushed:** ja — 11 commits naar origin/master
 
 ---
 
 ## Samenvatting recente wijzigingen
+
+### Sessie 2026-03-24 — WeekFlow: Netlify deployment
+
+- `weekflow.html` hernoemd naar `index.html`
+- `netlify.toml` aangemaakt: redirect `/api/chat → /.netlify/functions/chat`
+- `netlify/functions/chat.js`: serverless proxy naar Anthropic API (x-api-key server-side)
+- `server.js` + `package.json`: lokale Node.js server (alternatief voor Netlify dev)
+- `README.md`: deploy-instructies voor Netlify en lokale Netlify CLI
+
+### Sessie 2026-03-24 — WeekFlow: AI instructies in stap 2
+
+- Stap 2 uitgebreid met '📝 Extra instructies voor de AI' textarea + tekenteller
+- `_saveAIInstructions()` slaat direct op in `settings.aiInstructions` in localStorage
+- Stap 3 toont alleen nog bufferuren + bevestiging dat instructies ingesteld zijn
+- Systeemprompt: `aiInstructions` toegevoegd als directe tekst (niet als payload-veld)
+
+### Sessie 2026-03-24 — WeekFlow: ghost blocks direct geplaatst
+
+- Ghost blocks verschijnen onmiddellijk na plaatsen studieblok, zonder bevestiging
+- `_findAvailableSlot()`: zoekt conflictvrij tijdslot op voorkeursdag, anders volgende dag
+- `isShifted`-vlag + oranje badge 'Verschoven — geen vrije tijd' als blok verplaatst
+- Ghost popover: alleen 'Bevestig' en 'Verwijder' (geen dag/tijdvelden)
+- Ghost blocks sleepbaar; slepen wist `isShifted`
+- Pulserende animatie + '✓ Ingepland' label
+- Herhaling-offset gecorrigeerd: +3 en +7 dagen (was +3 en +10)
+
+### Sessie 2026-03-24 — WeekFlow: dynamische rijhoogte + AI planning wizard
+
+- Rijhoogte kalender via JS (`_updateCalRowHeight`), niet meer via CSS `calc(100vh)`
+- ResizeObserver op `.cal-container` voor live updates bij window resize
+- AI planning volledig werkend vanuit stap 3: `bufferHours` en `aiInstructions` uit wizard
+- Foutpad AI-planning navigeert naar lege kalender
 
 ### Sessie 2026-03-24 — WeekFlow: AI planning fix + drag & drop verbeteringen
 
