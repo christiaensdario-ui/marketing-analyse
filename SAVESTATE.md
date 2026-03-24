@@ -2,13 +2,58 @@
 
 ## Laatste opslag
 **Datum:** 2026-03-24
-**Commit hash:** `d362e5b`
+**Commit hash:** *(pending)*
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
 
 ---
 
 ## Samenvatting recente wijzigingen
+
+### Sessie 2026-03-24 — WeekFlow: studieplanning, ghost blocks, dagweergave
+
+#### WeekFlow uitbreidingen (`WeekFlow/weekflow.html`)
+
+**Studieblok logica:**
+- Studie-categorie krijgt speciaal popover: Vaknaam + live sessienummer + sessieduur info
+- `_getStudySessionNum(vaknaam)` — telt bestaande sessies per vaknaam, auto-increment
+- `_getSessionInfo(num)` — Sessie 1 = 45min, Sessie 2 = 30min, Sessie 3 = 45min, Herhaling = 15min
+- Duur automatisch bepaald door sessienummer, niet handmatig invulbaar
+- `_showStudyPopover`, `_updateStudyInfo`, `_confirmStudyAdd`
+
+**Automatische vervolgsessies (ghost blocks):**
+- Sessie 1 geplaatst → ghost Sessie 2 (dag+1)
+- Sessie 2 bevestigd → ghost Sessie 3 (dag+2)
+- Sessie 3 bevestigd → ghost Herhaling (dag+3) + ghost Herhaling (dag+10)
+- Ghost blokken: semi-transparant, gestreepte border, "❓" icoon
+- Ghost op volle dag → oranje highlight + "⚠️ Overbelast" tekst
+- Klik op ghost → popover met dag/tijd aanpassen + bevestigen/verwijderen
+- Bevestigen ghost → wordt echt blok, triggert volgende ghosts
+- `_placeGhostBlocks`, `_openGhostPopover`, `_confirmGhost`, `_deleteGhost`
+
+**Overbelasting detectie:**
+- Na elk blok plaatsen/bevestigen/verplaatsen/bewerken: `_checkOverbooking(day, newBlockId)`
+- Check: bevestigde uren + shift uren + buffer > 16u
+- Modal "⚠️ [Dag] is overbelast" met overzicht van blokken
+- Optie 1: "Verplaats blok" → dag/tijd picker → verplaatst het nieuwe blok (`_obMoveNewBlock`, `_obConfirmMove`)
+- Optie 2: ✕ per blok in lijst → direct verwijderen (`_obDelBlock`)
+- `_isDayFull`, `_checkOverbooking`, `_obClose`, `_obMoveNewBlock`, `_obConfirmMove`, `_obDelBlock`
+
+**Dagweergave:**
+- Klik op dagkoptekst in kalender → dagweergave (`navDay`)
+- Verticale lijst blokken gesorteerd op tijd, ghost blokken apart
+- Elk blok: kleurstip, tijdsbereik, naam, duur, checkbox done/undone
+- Voortgangsbalk: "X van Y blokken afgewerkt"
+- Verlopen + niet-afgewerkt blok → oranje banner met opties:
+  - "Later vandaag" → tijdpicker + overlapscheck (`_dvMoveLater`, `_dvConfirmMoveLater`)
+  - "Morgen" → direct verplaatst (`_dvMoveMorrow`)
+- Ghost blokken in dagweergave tonen "Bevestig" knop
+- Terug-knop → weekkalender
+- `_buildDayView`, `_dvToggleDone`, `_dvMoveLater`, `_dvConfirmMoveLater`, `_dvMoveMorrow`
+
+**Nieuwe state variabelen:** `_selectedDay`, `_obNewBlockId`
+
+---
 
 ### Sessie 2026-03-24 — WeekFlow: volledig kalenderscherm
 

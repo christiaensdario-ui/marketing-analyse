@@ -559,6 +559,108 @@
     .pop-del { background:#fee2e2; color:var(--red); }
     .pop-del:hover { background:var(--red); color:#fff; }
 
+    /* ── Study popover ──────────────────────────────────────── */
+    .pop-study-info {
+      background:var(--primary-light); border:1px solid var(--primary-mid);
+      border-radius:var(--radius-sm); padding:6px 10px 5px;
+      font-size:11px; color:var(--primary-dark); font-weight:600;
+      margin-bottom:8px;
+    }
+
+    /* ── Ghost blocks ────────────────────────────────────────── */
+    .cal-block.is-ghost { opacity:.55; border-style:dashed !important; cursor:pointer; }
+    .cal-block.is-ghost.overloaded { opacity:.85; }
+    .ghost-warn { font-size:7px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    /* ── Overbooking modal ───────────────────────────────────── */
+    #ob-modal {
+      position:fixed; inset:0; z-index:500;
+      background:rgba(0,0,0,.45);
+      display:flex; align-items:center; justify-content:center;
+    }
+    #ob-modal.hidden { display:none; }
+    .ob-box {
+      background:var(--surface); border-radius:var(--radius);
+      box-shadow:var(--shadow-md); padding:20px 22px;
+      max-width:340px; width:calc(100vw - 32px);
+    }
+    .ob-title { font-size:15px; font-weight:800; margin-bottom:5px; }
+    .ob-sub { font-size:12px; color:var(--text-muted); margin-bottom:12px; }
+    .ob-list { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+    .ob-block-row {
+      display:flex; align-items:center; gap:8px;
+      font-size:12px; padding:7px 9px;
+      background:var(--surface-alt); border-radius:var(--radius-sm);
+      border:1px solid var(--border);
+    }
+    .ob-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .ob-block-del {
+      margin-left:auto; font-size:10px; color:var(--red);
+      background:none; border:none; cursor:pointer; font-weight:700;
+      padding:2px 6px; border-radius:4px; font-family:inherit;
+    }
+    .ob-block-del:hover { background:#fee2e2; }
+    .ob-actions { display:flex; gap:6px; flex-wrap:wrap; }
+    .ob-btn {
+      flex:1; padding:7px 10px; border-radius:var(--radius-sm);
+      font-size:12px; font-weight:700; cursor:pointer; font-family:inherit;
+      border:1px solid var(--border); min-width:80px;
+    }
+    .ob-btn-close { background:var(--surface-alt); color:var(--text-muted); }
+    .ob-btn-move  { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .ob-btn-move:hover { background:var(--primary-dark); }
+
+    /* ── Day view ────────────────────────────────────────────── */
+    .dv-header-title { font-size:15px; font-weight:700; flex:1; text-align:center; }
+    .dv-progress-wrap {
+      padding:10px 16px 8px; background:var(--surface);
+      border-bottom:1px solid var(--border);
+    }
+    .dv-progress-label { font-size:12px; color:var(--text-muted); margin-bottom:5px; }
+    .dv-progress-bar { height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+    .dv-progress-fill { height:100%; background:var(--green); border-radius:3px; transition:width .3s; }
+    .dv-list { padding:10px 14px; display:flex; flex-direction:column; gap:8px; }
+    .dv-block {
+      background:var(--surface); border:1.5px solid var(--border);
+      border-radius:var(--radius-sm); padding:10px 12px;
+      display:flex; align-items:flex-start; gap:10px;
+      box-shadow:var(--shadow);
+    }
+    .dv-block.dv-done { opacity:.5; }
+    .dv-block.dv-done .dv-block-name { text-decoration:line-through; }
+    .dv-block.dv-overdue { border-color:#fb923c; background:#fff7ed; }
+    .dv-block.dv-ghost { border-style:dashed; border-color:var(--primary-mid); background:var(--primary-light); }
+    .dv-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+    .dv-block-info { flex:1; min-width:0; }
+    .dv-block-time { font-size:11px; color:var(--text-faint); margin-bottom:2px; }
+    .dv-block-name { font-size:13px; font-weight:700; margin-bottom:1px; }
+    .dv-block-dur { font-size:11px; color:var(--text-muted); }
+    .dv-overdue-banner {
+      margin-top:7px; padding:7px 9px; background:#fff7ed;
+      border:1px solid #fed7aa; border-radius:6px; font-size:11px; color:#c2410c;
+    }
+    .dv-overdue-actions { display:flex; gap:5px; margin-top:5px; flex-wrap:wrap; }
+    .dv-overdue-actions button {
+      padding:4px 9px; border-radius:5px; font-size:10px; font-weight:700;
+      cursor:pointer; font-family:inherit; background:#fff;
+      border:1px solid #fed7aa; color:#c2410c;
+    }
+    .dv-overdue-actions button:hover { background:#f97316; color:#fff; border-color:#f97316; }
+    .dv-ghost-banner { margin-top:4px; font-size:10px; color:var(--primary-dark); font-style:italic; }
+    .dv-confirm-btn {
+      flex-shrink:0; padding:5px 10px; border-radius:6px;
+      font-size:11px; font-weight:700; cursor:pointer;
+      font-family:inherit; background:var(--primary); color:#fff; border:none;
+      align-self:center;
+    }
+    .dv-confirm-btn:hover { background:var(--primary-dark); }
+    .dv-checkbox { display:flex; align-items:center; flex-shrink:0; align-self:center; }
+    .dv-checkbox input { width:18px; height:18px; cursor:pointer; accent-color:var(--primary); }
+    .dv-empty { text-align:center; color:var(--text-faint); font-size:14px; padding:40px 0; }
+    .cal-dh-day { cursor:pointer; }
+    .cal-dh-day:hover:not(.is-today) { background:var(--surface-alt); }
+    .cal-dh-day.is-today:hover { background:#bfdbfe; }
+
     /* ── Toast ───────────────────────────────────────────────── */
     #toast-el {
       position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
@@ -619,6 +721,8 @@ function _lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val))
 // ─── App state ────────────────────────────────────────────────────────────────
 let _screen      = 'start';
 let _calWeekOff  = 0;
+let _selectedDay = null;
+let _obNewBlockId = null;
 
 // Wizard state — reset on each new planning
 let _w = {
@@ -661,6 +765,7 @@ function _render() {
   if (_screen === 'start')    { app.innerHTML = _buildStart();    return; }
   if (_screen === 'wizard')   { app.innerHTML = _buildWizard();   return; }
   if (_screen === 'calendar') { app.innerHTML = _buildCalendar(); _initCalDragDrop(); return; }
+  if (_screen === 'day')      { app.innerHTML = _buildDayView();  return; }
 }
 
 // ─── Start page ───────────────────────────────────────────────────────────────
@@ -1116,7 +1221,7 @@ function _buildCalendar() {
   for (let i = 0; i < 7; i++) {
     const d   = _addDays(mon, i);
     const iso = _toISO(d);
-    dhDays += `<div class="cal-dh-day${iso === isoToday ? ' is-today' : ''}">
+    dhDays += `<div class="cal-dh-day${iso === isoToday ? ' is-today' : ''}" onclick="navDay('${iso}')">
       <div class="cal-dh-dn">${DN_SHORT[d.getDay()]}</div>
       <div class="cal-dh-dd">${d.getDate()}</div>
     </div>`;
@@ -1167,6 +1272,23 @@ function _buildCalendar() {
         style="top:calc(${b.startHour}*var(--row-h));height:calc(${b.durationHours}*var(--row-h));border-left-color:${color};background:${color}1a">
         <div class="cal-block-name">${_esc(label)}</div>
         ${showTime ? `<div class="cal-block-time">${_floatToTime(b.startHour)}–${endT}</div>` : ''}
+      </div>`;
+    });
+
+    // Ghost study blocks
+    blocks.filter(b => b.day === iso && b.isGhost).forEach(b => {
+      const cat   = cats.find(c => c.id === b.category);
+      const color = cat ? cat.color : '#94a3b8';
+      const overloaded = _isDayFull(iso);
+      const ghostStyle = overloaded
+        ? `border-left-color:#f97316;background:rgba(249,115,22,.12)`
+        : `border-left-color:${color};background:${color}1a`;
+      blockHtml += `<div class="cal-block is-ghost${overloaded ? ' overloaded' : ''}" data-ghost-id="${b.id}"
+        style="top:calc(${b.startHour}*var(--row-h));height:calc(${b.durationHours}*var(--row-h));${ghostStyle}">
+        <div class="cal-block-name">❓ ${_esc(b.name)}</div>
+        <div class="ghost-warn" style="color:${overloaded ? '#f97316' : 'var(--text-faint)'}">
+          ${overloaded ? '⚠️ Overbelast' : 'Bevestig ›'}
+        </div>
       </div>`;
     });
 
@@ -1243,6 +1365,14 @@ function _initCalDragDrop() {
     });
   });
 
+  // Ghost blocks → click to confirm/move
+  document.querySelectorAll('.cal-block[data-ghost-id]').forEach(blk => {
+    blk.addEventListener('click', e => {
+      e.stopPropagation();
+      _openGhostPopover(blk.dataset.ghostId, e.clientX, e.clientY);
+    });
+  });
+
   // Day bodies → drop targets
   document.querySelectorAll('.cal-day-body[data-day]').forEach(body => {
     body.addEventListener('dragover', e => {
@@ -1299,6 +1429,7 @@ function _showAddPopover(day, startHour, catId, x, y) {
   const cats = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
   const cat  = cats.find(c => c.id === catId);
   if (!cat) return;
+  if (catId === 'studie') { _showStudyPopover(day, startHour, catId, x, y); return; }
   _popCtx = { type: 'add', day, startHour, catId };
   _openPopover(`
     <div class="pop-title" style="border-left:3px solid ${cat.color}">${_esc(cat.name)} toevoegen</div>
@@ -1332,10 +1463,13 @@ function _confirmAdd() {
     return;
   }
   const blocks = _lsGet(KEYS.blocks, []);
-  blocks.push({ id: _genId(), day: _popCtx.day, startHour, durationHours: dur, category: _popCtx.catId, name: name.trim() });
+  const _newBlockId = _genId();
+  blocks.push({ id: _newBlockId, day: _popCtx.day, startHour, durationHours: dur, category: _popCtx.catId, name: name.trim() });
   _lsSet(KEYS.blocks, blocks);
+  const _addDay = _popCtx.day;
   _closePopover();
   _render();
+  _checkOverbooking(_addDay, _newBlockId);
 }
 
 function _showEditPopover(blockId, x, y) {
@@ -1384,8 +1518,11 @@ function _confirmEdit() {
   b.startHour = startHour;
   b.durationHours = dur;
   _lsSet(KEYS.blocks, blocks);
+  const _editDay = b.day;
+  const _editId  = b.id;
   _closePopover();
   _render();
+  _checkOverbooking(_editDay, _editId);
 }
 
 function _deleteBlock() {
@@ -1408,6 +1545,432 @@ function _moveBlock(blockId, day, startHour) {
   b.startHour = startHour;
   _lsSet(KEYS.blocks, blocks);
   _render();
+  _checkOverbooking(day, blockId);
+}
+
+// ─── Study block helpers ──────────────────────────────────────────────────────
+function _getStudySessionNum(vaknaam) {
+  const blocks = _lsGet(KEYS.blocks, []);
+  const norm   = vaknaam.trim().toLowerCase();
+  const existing = blocks.filter(b =>
+    b.category === 'studie' && !b.isGhost &&
+    b.vaknaam && b.vaknaam.trim().toLowerCase() === norm
+  );
+  if (!existing.length) return 1;
+  return Math.max(...existing.map(b => b.sessienummer || 1)) + 1;
+}
+
+function _getSessionInfo(num) {
+  if (num === 1) return { type: 'Sessie 1',  label: 'Sessie 1 · 45 min',  durMin: 45, durHours: 0.75 };
+  if (num === 2) return { type: 'Sessie 2',  label: 'Sessie 2 · 30 min',  durMin: 30, durHours: 0.5  };
+  if (num === 3) return { type: 'Sessie 3',  label: 'Sessie 3 · 45 min',  durMin: 45, durHours: 0.75 };
+  return               { type: 'Herhaling', label: 'Herhaling · 15 min', durMin: 15, durHours: 0.25 };
+}
+
+function _showStudyPopover(day, startHour, catId, x, y) {
+  const cats = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
+  const cat  = cats.find(c => c.id === catId) || { color: '#3b82f6', name: 'Studie' };
+  _popCtx = { type: 'study-add', day, startHour, catId };
+  _openPopover(`
+    <div class="pop-title" style="border-left:3px solid ${cat.color}">Studie toevoegen</div>
+    <div class="pop-field">
+      <div class="pop-lbl">Vaknaam</div>
+      <input id="pop-vak" type="text" placeholder="bijv. Wiskunde" oninput="_updateStudyInfo()">
+    </div>
+    <div id="pop-study-info" class="pop-study-info">📖 Sessie 1 · 45 min</div>
+    <div class="pop-field">
+      <div class="pop-lbl">Starttijd</div>
+      <input id="pop-time" type="time" value="${_floatToTime(startHour)}">
+    </div>
+    <div class="pop-actions">
+      <button class="pop-ok" onclick="_confirmStudyAdd()">Toevoegen</button>
+      <button class="pop-x"  onclick="_closePopover()">Annuleer</button>
+    </div>`, x, y);
+  setTimeout(() => { const i = document.getElementById('pop-vak'); if (i) i.focus(); }, 40);
+}
+
+function _updateStudyInfo() {
+  const vak  = ((document.getElementById('pop-vak') || {}).value || '').trim();
+  const num  = vak ? _getStudySessionNum(vak) : 1;
+  const info = _getSessionInfo(num);
+  const el   = document.getElementById('pop-study-info');
+  if (el) el.textContent = '📖 ' + info.label;
+}
+
+function _confirmStudyAdd() {
+  if (!_popCtx || _popCtx.type !== 'study-add') return;
+  const vak = ((document.getElementById('pop-vak') || {}).value || '').trim();
+  if (!vak) { showToast('Vul een vaknaam in'); return; }
+  const timeVal   = (document.getElementById('pop-time') || {}).value;
+  const startHour = _timeToFloat(timeVal || _floatToTime(_popCtx.startHour));
+  const num       = _getStudySessionNum(vak);
+  const info      = _getSessionInfo(num);
+  if (_checkOverlap(_popCtx.day, startHour, info.durHours)) {
+    showToast('⚠️ Overlapt met bestaand blok of werkshift'); return;
+  }
+  const blocks = _lsGet(KEYS.blocks, []);
+  const newBlock = {
+    id: _genId(), day: _popCtx.day, startHour,
+    durationHours: info.durHours, category: 'studie',
+    name: vak + ' — ' + info.type,
+    vaknaam: vak, sessienummer: num, sessionType: info.type,
+    isGhost: false, done: false,
+  };
+  blocks.push(newBlock);
+  _lsSet(KEYS.blocks, blocks);
+  _placeGhostBlocks(newBlock);
+  const saveDay = _popCtx.day;
+  const saveId  = newBlock.id;
+  _closePopover();
+  _render();
+  _checkOverbooking(saveDay, saveId);
+}
+
+function _placeGhostBlocks(block) {
+  if (block.category !== 'studie' || block.isGhost) return;
+  const blocks = _lsGet(KEYS.blocks, []);
+  const num = block.sessienummer || 1;
+  const mkGhost = (dayOff, gNum) => {
+    const info = _getSessionInfo(gNum);
+    blocks.push({
+      id: _genId(),
+      day: _toISO(_addDays(new Date(block.day + 'T12:00:00'), dayOff)),
+      startHour: block.startHour, durationHours: info.durHours,
+      category: 'studie', name: block.vaknaam + ' — ' + info.type,
+      vaknaam: block.vaknaam, sessienummer: gNum, sessionType: info.type,
+      isGhost: true, done: false, parentBlockId: block.id,
+    });
+  };
+  if (num === 1) { mkGhost(1, 2); }
+  else if (num === 2) { mkGhost(2, 3); }
+  else if (num === 3) { mkGhost(3, 4); mkGhost(10, 4); }
+  _lsSet(KEYS.blocks, blocks);
+}
+
+// ─── Ghost confirm ────────────────────────────────────────────────────────────
+function _openGhostPopover(ghostId, x, y) {
+  const blocks = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === ghostId);
+  if (!b) return;
+  const cats  = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
+  const cat   = cats.find(c => c.id === b.category);
+  const color = cat ? cat.color : '#94a3b8';
+  _popCtx = { type: 'ghost', ghostId };
+  _openPopover(`
+    <div class="pop-title" style="border-left:3px solid ${color}">❓ ${_esc(b.name)}</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
+      Automatisch ingepland · ${_esc(b.day)} · ${_floatToTime(b.startHour)}
+    </div>
+    <div class="pop-field">
+      <div class="pop-lbl">Dag</div>
+      <input id="pop-ghost-day" type="date" value="${b.day}">
+    </div>
+    <div class="pop-field">
+      <div class="pop-lbl">Starttijd</div>
+      <input id="pop-ghost-time" type="time" value="${_floatToTime(b.startHour)}">
+    </div>
+    <div class="pop-actions">
+      <button class="pop-ok"  onclick="_confirmGhost()">Bevestig</button>
+      <button class="pop-del" onclick="_deleteGhost()">Verwijder</button>
+      <button class="pop-x"   onclick="_closePopover()">✕</button>
+    </div>`, x, y);
+}
+
+function _confirmGhost() {
+  if (!_popCtx || _popCtx.type !== 'ghost') return;
+  const ghostId  = _popCtx.ghostId;
+  const dayVal   = (document.getElementById('pop-ghost-day')  || {}).value;
+  const timeVal  = (document.getElementById('pop-ghost-time') || {}).value;
+  const blocks   = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === ghostId);
+  if (!b) return;
+  const newDay   = dayVal  || b.day;
+  const newStart = _timeToFloat(timeVal || _floatToTime(b.startHour));
+  if (_checkOverlap(newDay, newStart, b.durationHours, ghostId)) {
+    showToast('⚠️ Overlapt met bestaand blok of werkshift'); return;
+  }
+  b.day = newDay; b.startHour = newStart; b.isGhost = false; b.done = false;
+  _lsSet(KEYS.blocks, blocks);
+  _placeGhostBlocks(b);
+  const saveDay = b.day;
+  const saveId  = b.id;
+  _closePopover();
+  _render();
+  _checkOverbooking(saveDay, saveId);
+}
+
+function _deleteGhost() {
+  if (!_popCtx || _popCtx.type !== 'ghost') return;
+  const blocks = _lsGet(KEYS.blocks, []);
+  _lsSet(KEYS.blocks, blocks.filter(b => b.id !== _popCtx.ghostId));
+  _closePopover();
+  _render();
+}
+
+// ─── Overbooking ──────────────────────────────────────────────────────────────
+function _isDayFull(iso) {
+  const blocks   = _lsGet(KEYS.blocks, []);
+  const shifts   = _lsGet(KEYS.workshifts, []);
+  const settings = _lsGet(KEYS.settings, {});
+  const buffer   = settings.bufferHours != null ? settings.bufferHours : 1;
+  const confH    = blocks.filter(b => b.day === iso && !b.isGhost)
+                         .reduce((s, b) => s + b.durationHours, 0);
+  const sh    = shifts.find(s => s.date === iso);
+  const shiftH = sh ? _timeToFloat(sh.endHour) - _timeToFloat(sh.startHour) : 0;
+  return (confH + shiftH + buffer) > 16;
+}
+
+function _checkOverbooking(day, newBlockId) {
+  if (!_isDayFull(day)) return;
+  _obNewBlockId = newBlockId || null;
+  const blocks = _lsGet(KEYS.blocks, []);
+  const cats   = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
+  const shifts = _lsGet(KEYS.workshifts, []);
+  const d = new Date(day + 'T12:00:00');
+  const dayLabel = DN_SHORT[d.getDay()] + ' ' + _fmtDate(d);
+  const sh = shifts.find(s => s.date === day);
+  let rows = '';
+  if (sh) {
+    rows += `<div class="ob-block-row">
+      <div class="ob-dot" style="background:var(--primary)"></div>
+      <div style="flex:1">${_esc(sh.label || 'Werkblok')}
+        <span style="color:var(--text-faint)"> ${sh.startHour}–${sh.endHour}</span></div>
+    </div>`;
+  }
+  blocks.filter(b => b.day === day && !b.isGhost).forEach(b => {
+    const cat   = cats.find(c => c.id === b.category);
+    const color = cat ? cat.color : '#94a3b8';
+    rows += `<div class="ob-block-row">
+      <div class="ob-dot" style="background:${color}"></div>
+      <div style="flex:1">${_esc(b.name)}
+        <span style="color:var(--text-faint)"> ${_floatToTime(b.startHour)}–${_floatToTime(b.startHour + b.durationHours)}</span></div>
+      <button class="ob-block-del" onclick="_obDelBlock('${b.id}')">✕</button>
+    </div>`;
+  });
+  const modal = document.getElementById('ob-modal');
+  if (!modal) return;
+  const moveBtn = _obNewBlockId
+    ? `<button class="ob-btn ob-btn-move" onclick="_obMoveNewBlock()">Verplaats blok</button>` : '';
+  modal.innerHTML = `<div class="ob-box">
+    <div class="ob-title">⚠️ ${_esc(dayLabel)} is overbelast</div>
+    <div class="ob-sub">Er is meer ingepland dan beschikbare tijd. Verplaats of verwijder een blok.</div>
+    <div class="ob-list">${rows}</div>
+    <div class="ob-actions">
+      ${moveBtn}
+      <button class="ob-btn ob-btn-close" onclick="_obClose()">Sluiten</button>
+    </div>
+  </div>`;
+  modal.classList.remove('hidden');
+}
+
+function _obDelBlock(blockId) {
+  const blocks = _lsGet(KEYS.blocks, []);
+  _lsSet(KEYS.blocks, blocks.filter(b => b.id !== blockId));
+  _obClose();
+  _render();
+}
+
+function _obClose() {
+  const modal = document.getElementById('ob-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function _obMoveNewBlock() {
+  if (!_obNewBlockId) return;
+  _obClose();
+  const blocks = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === _obNewBlockId);
+  if (!b) return;
+  const cats  = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
+  const cat   = cats.find(c => c.id === b.category);
+  const color = cat ? cat.color : '#94a3b8';
+  _popCtx = { type: 'ob-move', blockId: _obNewBlockId };
+  _openPopover(`
+    <div class="pop-title" style="border-left:3px solid ${color}">Verplaats ${_esc(b.name)}</div>
+    <div class="pop-field">
+      <div class="pop-lbl">Naar dag</div>
+      <input id="pop-ob-day" type="date" value="${b.day}">
+    </div>
+    <div class="pop-field">
+      <div class="pop-lbl">Starttijd</div>
+      <input id="pop-ob-time" type="time" value="${_floatToTime(b.startHour)}">
+    </div>
+    <div class="pop-actions">
+      <button class="pop-ok" onclick="_obConfirmMove()">Verplaats</button>
+      <button class="pop-x"  onclick="_closePopover()">Annuleer</button>
+    </div>`, window.innerWidth / 2, window.innerHeight / 2);
+}
+
+function _obConfirmMove() {
+  if (!_popCtx || _popCtx.type !== 'ob-move') return;
+  const dayVal  = (document.getElementById('pop-ob-day')  || {}).value;
+  const timeVal = (document.getElementById('pop-ob-time') || {}).value;
+  if (!dayVal) return;
+  const blocks   = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === _popCtx.blockId);
+  if (!b) return;
+  const newStart = _timeToFloat(timeVal || _floatToTime(b.startHour));
+  if (_checkOverlap(dayVal, newStart, b.durationHours, b.id)) {
+    showToast('⚠️ Overlapt op die dag — kies een andere tijd'); return;
+  }
+  b.day = dayVal;
+  b.startHour = newStart;
+  _lsSet(KEYS.blocks, blocks);
+  _closePopover();
+  _render();
+}
+
+// ─── Day view ─────────────────────────────────────────────────────────────────
+function navDay(iso) {
+  _selectedDay = iso;
+  _screen = 'day';
+  _render();
+  window.scrollTo({ top: 0 });
+}
+
+function _buildDayView() {
+  const iso    = _selectedDay;
+  const d      = new Date(iso + 'T12:00:00');
+  const dayLbl = DN_SHORT[d.getDay()] + ' ' + _fmtDate(d) + ' ' + d.getFullYear();
+  const now    = new Date();
+  const isToday = _toISO(now) === iso;
+  const nowH   = now.getHours() + now.getMinutes() / 60;
+
+  const blocks    = _lsGet(KEYS.blocks, []);
+  const cats      = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
+  const dayBlocks = blocks.filter(b => b.day === iso).sort((a, b) => a.startHour - b.startHour);
+  const realBlocks = dayBlocks.filter(b => !b.isGhost);
+  const doneCount  = realBlocks.filter(b => b.done).length;
+  const progress   = realBlocks.length ? Math.round(doneCount / realBlocks.length * 100) : 0;
+
+  let items = '';
+  dayBlocks.forEach(b => {
+    const cat   = cats.find(c => c.id === b.category);
+    const color = cat ? cat.color : '#94a3b8';
+    const endH  = b.startHour + b.durationHours;
+    const isPast    = isToday && nowH > endH;
+    const isOverdue = isPast && !b.done && !b.isGhost;
+    const durTxt = b.durationHours >= 1
+      ? b.durationHours + 'u'
+      : Math.round(b.durationHours * 60) + ' min';
+
+    if (b.isGhost) {
+      items += `<div class="dv-block dv-ghost">
+        <div class="dv-dot" style="background:${color}"></div>
+        <div class="dv-block-info">
+          <div class="dv-block-time">${_floatToTime(b.startHour)} – ${_floatToTime(endH)}</div>
+          <div class="dv-block-name">❓ ${_esc(b.name)}</div>
+          <div class="dv-ghost-banner">Automatisch ingepland — bevestig of verplaats</div>
+        </div>
+        <button class="dv-confirm-btn" onclick="_openGhostPopover('${b.id}', window.innerWidth/2, window.innerHeight/2)">Bevestig</button>
+      </div>`;
+    } else {
+      items += `<div class="dv-block${b.done ? ' dv-done' : ''}${isOverdue ? ' dv-overdue' : ''}">
+        <div class="dv-dot" style="background:${color}"></div>
+        <div class="dv-block-info">
+          <div class="dv-block-time">${_floatToTime(b.startHour)} – ${_floatToTime(endH)}</div>
+          <div class="dv-block-name">${_esc(b.name)}</div>
+          <div class="dv-block-dur">${_esc(durTxt)}</div>
+          ${isOverdue ? `<div class="dv-overdue-banner">
+            ⏰ ${_esc(b.name)} niet afgewerkt — wat wil je doen?
+            <div class="dv-overdue-actions">
+              <button onclick="_dvMoveLater('${b.id}')">Later vandaag</button>
+              <button onclick="_dvMoveMorrow('${b.id}')">Morgen</button>
+            </div>
+          </div>` : ''}
+        </div>
+        <label class="dv-checkbox">
+          <input type="checkbox" ${b.done ? 'checked' : ''}
+            onchange="_dvToggleDone('${b.id}', this.checked)">
+        </label>
+      </div>`;
+    }
+  });
+
+  if (!items) items = '<div class="dv-empty">Geen blokken voor deze dag</div>';
+
+  return `
+    <div class="screen-header">
+      <button class="back-btn" onclick="nav('calendar')">‹ Week</button>
+      <div class="dv-header-title">${_esc(dayLbl)}</div>
+      <div></div>
+    </div>
+    <div class="dv-progress-wrap">
+      <div class="dv-progress-label">${doneCount} van ${realBlocks.length} blokken afgewerkt</div>
+      <div class="dv-progress-bar"><div class="dv-progress-fill" style="width:${progress}%"></div></div>
+    </div>
+    <div class="dv-list">${items}</div>`;
+}
+
+function _dvToggleDone(blockId, checked) {
+  const blocks = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === blockId);
+  if (b) { b.done = checked; _lsSet(KEYS.blocks, blocks); }
+  // Update progress bar without full re-render
+  const realBlocks = blocks.filter(bk => bk.day === _selectedDay && !bk.isGhost);
+  const done = realBlocks.filter(bk => bk.done).length;
+  const pct  = realBlocks.length ? Math.round(done / realBlocks.length * 100) : 0;
+  const lbl  = document.querySelector('.dv-progress-label');
+  const fill = document.querySelector('.dv-progress-fill');
+  if (lbl)  lbl.textContent = done + ' van ' + realBlocks.length + ' blokken afgewerkt';
+  if (fill) fill.style.width = pct + '%';
+  // Toggle done class on row
+  const rows = document.querySelectorAll('.dv-block');
+  rows.forEach(row => {
+    const cb = row.querySelector('input[type="checkbox"]');
+    if (cb && (cb.getAttribute('onchange') || '').includes(blockId)) {
+      checked ? row.classList.add('dv-done') : row.classList.remove('dv-done');
+    }
+  });
+}
+
+function _dvMoveLater(blockId) {
+  const blocks  = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === blockId);
+  if (!b) return;
+  const cats  = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
+  const cat   = cats.find(c => c.id === b.category);
+  const color = cat ? cat.color : '#94a3b8';
+  const suggest = Math.min(b.startHour + b.durationHours + 0.5, 22);
+  _popCtx = { type: 'move-later', blockId, day: b.day };
+  _openPopover(`
+    <div class="pop-title" style="border-left:3px solid ${color}">Later vandaag verplaatsen</div>
+    <div class="pop-field">
+      <div class="pop-lbl">Nieuwe starttijd</div>
+      <input id="pop-new-time" type="time" value="${_floatToTime(suggest)}">
+    </div>
+    <div class="pop-actions">
+      <button class="pop-ok" onclick="_dvConfirmMoveLater()">Verplaats</button>
+      <button class="pop-x"  onclick="_closePopover()">Annuleer</button>
+    </div>`, window.innerWidth / 2, window.innerHeight / 2);
+}
+
+function _dvConfirmMoveLater() {
+  if (!_popCtx || _popCtx.type !== 'move-later') return;
+  const timeVal = (document.getElementById('pop-new-time') || {}).value;
+  if (!timeVal) return;
+  const newStart = _timeToFloat(timeVal);
+  const blocks   = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === _popCtx.blockId);
+  if (!b) return;
+  if (_checkOverlap(b.day, newStart, b.durationHours, b.id)) {
+    showToast('⚠️ Overlapt met bestaand blok of shift'); return;
+  }
+  b.startHour = newStart;
+  _lsSet(KEYS.blocks, blocks);
+  _closePopover();
+  _render();
+}
+
+function _dvMoveMorrow(blockId) {
+  const blocks  = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === blockId);
+  if (!b) return;
+  const morrow = _toISO(_addDays(new Date(b.day + 'T12:00:00'), 1));
+  b.day = morrow;
+  _lsSet(KEYS.blocks, blocks);
+  showToast('Verplaatst naar morgen');
+  _render();
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -1427,5 +1990,6 @@ function _init() {
 
 _init();
 </script>
+<div id="ob-modal" class="hidden"></div>
 </body>
 </html>
