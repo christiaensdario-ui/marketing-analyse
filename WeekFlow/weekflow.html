@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WeekFlow</title>
+  <style>
+    /* ── Variables ───────────────────────────────────────────── */
+    :root {
+      --bg:            #f0f4f8;
+      --surface:       #ffffff;
+      --surface-alt:   #f8fafc;
+      --border:        #e2e8f0;
+      --primary:       #3b82f6;
+      --primary-light: #dbeafe;
+      --primary-mid:   #93c5fd;
+      --primary-dark:  #1d4ed8;
+      --text:          #1e293b;
+      --text-muted:    #64748b;
+      --text-faint:    #94a3b8;
+      --green:         #22c55e;
+      --red:           #ef4444;
+      --radius:        16px;
+      --radius-sm:     10px;
+      --shadow:        0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      --shadow-md:     0 4px 14px rgba(0,0,0,.09);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #app {
+      max-width: 560px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+
+    @media (min-width: 800px) { #app { max-width: 740px; } }
+
+    /* ── Start page ──────────────────────────────────────────── */
+    .start-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 64px 24px 48px;
+      min-height: 100vh;
+    }
+    .start-logo-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+    .start-logo {
+      font-size: 40px;
+      font-weight: 900;
+      color: var(--primary);
+      letter-spacing: -1.5px;
+      margin-bottom: 6px;
+    }
+    .start-sub {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 52px;
+    }
+    .start-card {
+      width: 100%;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 14px;
+      cursor: pointer;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      box-shadow: var(--shadow);
+      user-select: none;
+    }
+    .start-card:hover {
+      border-color: var(--primary-mid);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
+    .start-card-icon { font-size: 34px; flex-shrink: 0; }
+    .start-card-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .start-card-sub { font-size: 13px; color: var(--text-muted); }
+    .start-card-arrow { margin-left: auto; color: var(--text-faint); font-size: 22px; flex-shrink: 0; }
+
+    /* ── Shared header & layout ──────────────────────────────── */
+    .screen-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 13px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .back-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--primary);
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 4px 0;
+      font-family: inherit;
+      flex-shrink: 0;
+    }
+    .header-title { font-size: 17px; font-weight: 700; flex: 1; }
+    .screen-content { padding: 20px 20px 100px; }
+    .step-heading {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -.4px;
+      margin-bottom: 5px;
+    }
+    .step-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 22px; }
+
+    /* ── Progress bar ────────────────────────────────────────── */
+    .progress-bar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 18px 32px 6px;
+    }
+    .progress-step { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .progress-dot {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: var(--text-faint);
+      transition: all .2s;
+    }
+    .progress-dot.active { border-color: var(--primary); background: var(--primary); color: #fff; }
+    .progress-dot.done   { border-color: var(--green);   background: var(--green);   color: #fff; }
+    .progress-label { font-size: 11px; color: var(--text-faint); font-weight: 500; white-space: nowrap; }
+    .progress-dot.active ~ .progress-label,
+    .progress-dot.done  ~ .progress-label { color: var(--text-muted); }
+    .progress-line {
+      flex: 1; height: 2px; background: var(--border);
+      max-width: 72px; min-width: 20px;
+      margin-top: 14px; /* align with dot center (30px / 2 - 1px) */
+      margin-bottom: 22px;
+    }
+    .progress-line.done { background: var(--green); }
+
+    /* ── Bottom action bar ───────────────────────────────────── */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 100%; max-width: 560px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 12px 20px 20px;
+      z-index: 20;
+    }
+    @media (min-width: 800px) { .bottom-bar { max-width: 740px; } }
+    .bottom-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background .12s;
+    }
+    .bottom-btn:hover { background: var(--primary-dark); }
+
+    /* ── Step 1: Shifts ──────────────────────────────────────── */
+    .shift-list { display: flex; flex-direction: column; gap: 7px; }
+    .shift-row {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      transition: border-color .12s;
+    }
+    .shift-row.is-editing { border-color: var(--primary-mid); }
+    .shift-row-main {
+      display: flex; align-items: center;
+      padding: 11px 14px; gap: 12px;
+    }
+    .shift-date-col { flex-shrink: 0; width: 62px; }
+    .shift-day-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); }
+    .shift-day-lbl.weekend { color: var(--text-muted); }
+    .shift-date-num { font-size: 15px; font-weight: 700; }
+    .shift-middle { flex: 1; }
+    .shift-bar {
+      display: inline-flex; align-items: center;
+      background: var(--primary-light); border: 1px solid var(--primary-mid);
+      border-radius: 6px; padding: 5px 10px; gap: 6px;
+      font-size: 12px; color: var(--primary-dark); font-weight: 600;
+    }
+    .shift-add-btn {
+      background: none; border: 1.5px dashed var(--border);
+      border-radius: 6px; padding: 5px 12px;
+      font-size: 12px; color: var(--text-muted);
+      cursor: pointer; font-family: inherit; transition: all .12s;
+    }
+    .shift-add-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .icon-btn-sm {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-faint); padding: 3px 7px;
+      border-radius: 5px; font-size: 13px; font-family: inherit;
+      transition: color .12s;
+    }
+    .icon-btn-sm:hover { color: var(--red); background: #fee2e2; }
+    .edit-lnk {
+      background: none; border: none; cursor: pointer;
+      color: var(--primary); font-size: 12px; font-weight: 600;
+      padding: 3px 6px; font-family: inherit;
+    }
+
+    .shift-form {
+      padding: 13px 14px 14px;
+      border-top: 1px solid var(--border);
+      background: #fafcff;
+    }
+    .sf-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; align-items: flex-end; }
+    .sf-group { display: flex; flex-direction: column; gap: 4px; }
+    .sf-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); }
+    .sf-group input[type="time"],
+    .sf-group input[type="text"] {
+      padding: 8px 10px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 13px; font-family: inherit; color: var(--text); background: var(--surface);
+      transition: border-color .12s;
+    }
+    .sf-group input[type="time"] { width: 112px; }
+    .sf-group input[type="text"] { min-width: 90px; flex: 1; }
+    .sf-group input:focus { outline: none; border-color: var(--primary); }
+    .sf-group-label { flex: 1; }
+    .sf-actions { display: flex; gap: 8px; }
+    .btn-save {
+      padding: 8px 18px; background: var(--primary); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+      transition: background .12s;
+    }
+    .btn-save:hover { background: var(--primary-dark); }
+    .btn-cancel {
+      padding: 8px 14px; background: none; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .btn-cancel:hover { background: var(--surface-alt); }
+    .btn-del {
+      padding: 8px 14px; background: none; color: var(--red);
+      border: 1px solid #fca5a5; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .btn-del:hover { background: #fee2e2; }
+
+    /* ── Step 2: Categories ──────────────────────────────────── */
+    .cat-list { display: flex; flex-direction: column; gap: 10px; }
+    .cat-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      transition: border-color .15s;
+    }
+    .cat-card.enabled { border-color: var(--primary-mid); }
+    .cat-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; cursor: pointer; user-select: none;
+    }
+    .cat-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
+    .cat-name {
+      font-size: 15px; font-weight: 600; color: var(--text); flex: 1; min-width: 0;
+    }
+    .cat-name-input {
+      background: none; border: none; border-bottom: 1px solid transparent;
+      font-size: 15px; font-weight: 600; color: var(--text);
+      flex: 1; padding: 0; font-family: inherit; min-width: 0; width: 100%;
+    }
+    .cat-name-input:focus { outline: none; border-bottom-color: var(--primary-mid); }
+    .cat-summary { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+    /* Toggle */
+    .toggle { position: relative; width: 44px; height: 25px; flex-shrink: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: var(--border); border-radius: 13px;
+      cursor: pointer; transition: background .2s;
+    }
+    .toggle-track::before {
+      content: ''; position: absolute;
+      width: 19px; height: 19px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%;
+      transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.15);
+    }
+    .toggle input:checked + .toggle-track { background: var(--primary); }
+    .toggle input:checked + .toggle-track::before { transform: translateX(19px); }
+
+    .cat-body {
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--border);
+      background: #fafcff;
+    }
+    .cat-fields { display: flex; gap: 12px; flex-wrap: wrap; }
+    .cat-field { display: flex; flex-direction: column; gap: 5px; }
+    .cat-field-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .05em; color: var(--text-faint);
+    }
+    .cat-field input[type="number"] {
+      width: 80px; padding: 8px 10px; text-align: center;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 14px; font-weight: 600; font-family: inherit; color: var(--text);
+      background: var(--surface); transition: border-color .12s;
+    }
+    .cat-field input[type="number"]:focus { outline: none; border-color: var(--primary); }
+    .cat-field textarea {
+      width: 100%; padding: 8px 10px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 13px; font-family: inherit; color: var(--text); background: var(--surface);
+      resize: vertical; min-height: 54px; transition: border-color .12s;
+    }
+    .cat-field textarea:focus { outline: none; border-color: var(--primary); }
+    .cat-field-notes { flex: 1; min-width: 200px; }
+
+    .add-cat-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 12px;
+      background: none; border: 1.5px dashed var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted); font-size: 14px;
+      cursor: pointer; margin-top: 10px; font-family: inherit;
+      transition: all .12s;
+    }
+    .add-cat-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .cat-remove-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-faint); padding: 0 0 0 6px;
+      font-size: 14px; line-height: 1; flex-shrink: 0;
+    }
+    .cat-remove-btn:hover { color: var(--red); }
+
+    /* ── Step 3: Overview ────────────────────────────────────── */
+    .overview-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .overview-title {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--text-faint); margin-bottom: 10px;
+    }
+    .overview-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+    }
+    .overview-row:last-child { border-bottom: none; }
+    .ov-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .overview-total { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+    .big-btn {
+      width: 100%; padding: 16px;
+      border-radius: var(--radius-sm);
+      font-size: 16px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      border: none; transition: all .15s;
+    }
+    .big-btn-ai {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(99,102,241,.3);
+    }
+    .big-btn-ai:hover { opacity: .9; transform: translateY(-1px); }
+    .big-btn-plan {
+      background: var(--surface); color: var(--primary);
+      border: 2px solid var(--primary-mid) !important;
+    }
+    .big-btn-plan:hover { background: var(--primary-light); }
+
+    /* ── Calendar v2 ─────────────────────────────────────────── */
+    :root {
+      --cal-topbar-h:  52px;
+      --cal-colhead-h: 44px;
+      --cal-bottom-h:  44px;
+      --cal-timecol-w: 34px;
+      --cal-sidebar-w: 152px;
+      --row-h: calc((100vh - var(--cal-topbar-h) - var(--cal-colhead-h) - var(--cal-bottom-h)) / 24);
+    }
+    #app.cal-mode { max-width: 100%; overflow: hidden; }
+    .cal-container { display:flex; flex-direction:column; height:100vh; overflow:hidden; background:var(--bg); }
+    .cal-topbar {
+      height:var(--cal-topbar-h); background:var(--surface); border-bottom:1px solid var(--border);
+      display:flex; align-items:center; padding:0 10px; gap:5px; flex-shrink:0; z-index:20;
+    }
+    .cal-topbar .back-btn { padding:4px 2px; }
+    .cal-week-lbl { flex:1; text-align:center; font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cal-today-btn {
+      padding:5px 9px; background:var(--primary-light); border:1px solid var(--primary-mid);
+      border-radius:var(--radius-sm); color:var(--primary-dark); font-size:11px; font-weight:700;
+      cursor:pointer; font-family:inherit; white-space:nowrap; flex-shrink:0;
+    }
+    .cal-today-btn:hover { background:var(--primary); color:#fff; }
+    .arrow-btn {
+      width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+      background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius-sm);
+      cursor:pointer; font-size:16px; color:var(--text-muted); transition:background .12s; flex-shrink:0;
+    }
+    .arrow-btn:hover { background:var(--primary-light); color:var(--primary); }
+    .cal-new-btn {
+      padding:5px 9px; background:var(--surface-alt); border:1px solid var(--border);
+      border-radius:var(--radius-sm); color:var(--text-muted); font-size:11px; font-weight:600;
+      cursor:pointer; font-family:inherit; white-space:nowrap; flex-shrink:0;
+    }
+    .cal-new-btn:hover { border-color:var(--primary-mid); color:var(--primary); background:var(--primary-light); }
+    .cal-body { display:flex; flex:1; overflow:hidden; }
+    /* Sidebar */
+    .cal-sidebar {
+      width:var(--cal-sidebar-w); flex-shrink:0; border-right:1px solid var(--border);
+      background:var(--surface); display:flex; flex-direction:column; overflow:hidden;
+    }
+    .cal-sidebar-hdr {
+      font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+      color:var(--text-faint); padding:9px 10px 7px; flex-shrink:0; border-bottom:1px solid var(--border);
+    }
+    .cal-tiles { overflow-y:auto; flex:1; padding:6px 7px; display:flex; flex-direction:column; gap:4px; }
+    .cat-tile {
+      display:flex; align-items:center; gap:6px; padding:7px 8px;
+      background:var(--surface-alt); border:1.5px solid var(--border);
+      border-radius:var(--radius-sm); cursor:grab; user-select:none; transition:all .12s;
+    }
+    .cat-tile:active { cursor:grabbing; }
+    .cat-tile:hover { border-color:var(--primary-mid); box-shadow:var(--shadow); background:#f0f7ff; }
+    .cat-tile.dragging { opacity:.3; }
+    .cat-tile-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .cat-tile-name { font-size:11px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0; }
+    .cat-tile-dur { font-size:10px; color:var(--text-faint); flex-shrink:0; }
+    .cal-sidebar-hint { font-size:10px; color:var(--text-faint); padding:6px 8px 4px; line-height:1.5; }
+    /* Content */
+    .cal-content { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+    /* Day headers */
+    .cal-dh-row {
+      height:var(--cal-colhead-h); display:flex; flex-shrink:0;
+      border-bottom:1px solid var(--border); background:var(--surface);
+    }
+    .cal-dh-spacer { width:var(--cal-timecol-w); flex-shrink:0; border-right:1px solid var(--border); }
+    .cal-dh-days { flex:1; display:grid; grid-template-columns:repeat(7,1fr); }
+    .cal-dh-day {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      border-right:1px solid var(--border); gap:1px;
+    }
+    .cal-dh-day:last-child { border-right:none; }
+    .cal-dh-dn { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-faint); }
+    .cal-dh-dd { font-size:16px; font-weight:800; }
+    .cal-dh-day.is-today { background:var(--primary-light); }
+    .cal-dh-day.is-today .cal-dh-dn { color:var(--primary); }
+    .cal-dh-day.is-today .cal-dh-dd { color:var(--primary); }
+    /* Grid area */
+    .cal-grid-area { flex:1; display:flex; overflow:hidden; }
+    .cal-time-col { width:var(--cal-timecol-w); flex-shrink:0; border-right:1px solid var(--border); overflow:hidden; background:var(--surface); }
+    .cal-hour-lbl {
+      height:var(--row-h); display:flex; align-items:flex-start; justify-content:flex-end;
+      padding:2px 4px 0 0; font-size:8px; font-weight:600; color:var(--text-faint);
+      border-bottom:1px solid #edf2f7; box-sizing:border-box;
+    }
+    .cal-days-wrap { flex:1; display:grid; grid-template-columns:repeat(7,1fr); overflow:hidden; }
+    .cal-day-col { position:relative; border-right:1px solid var(--border); overflow:hidden; }
+    .cal-day-col:last-child { border-right:none; }
+    .cal-day-body { position:relative; height:calc(var(--row-h) * 24); }
+    .cal-day-body.drag-over::before {
+      content:''; position:absolute; inset:0; background:rgba(59,130,246,.08);
+      border:2px dashed var(--primary-mid); border-radius:2px; z-index:5; pointer-events:none; box-sizing:border-box;
+    }
+    .cal-hcell { position:absolute; left:0; right:0; height:var(--row-h); box-sizing:border-box; border-bottom:1px solid #f1f5f9; }
+    .cal-hcell.even { background:var(--surface-alt); }
+    /* Activity block */
+    .cal-block {
+      position:absolute; left:2px; right:2px; border-radius:4px;
+      border-left:3px solid transparent; padding:2px 5px;
+      font-size:9px; box-shadow:0 1px 4px rgba(0,0,0,.1);
+      overflow:hidden; cursor:pointer; z-index:2; box-sizing:border-box;
+      transition:box-shadow .1s, transform .1s;
+    }
+    .cal-block:hover { box-shadow:0 2px 8px rgba(0,0,0,.2); z-index:4; transform:translateX(1px); }
+    .cal-block.dragging { opacity:.35; }
+    .cal-block-name { font-weight:700; color:var(--text); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cal-block-time { color:var(--text-muted); line-height:1.3; }
+    /* Work shift */
+    .cal-shift {
+      position:absolute; left:0; right:0; border-radius:2px; box-sizing:border-box;
+      border-left:3px solid var(--primary); padding:2px 4px;
+      background:repeating-linear-gradient(45deg,#dbeafe,#dbeafe 4px,#eff6ff 4px,#eff6ff 8px);
+      font-size:8px; color:var(--primary-dark); font-weight:600; z-index:1; overflow:hidden;
+    }
+    /* Beyond-horizon */
+    .cal-day-col.beyond .cal-day-body { opacity:.4; pointer-events:none; }
+    .cal-horizon-overlay {
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:8;
+    }
+    .cal-horizon-btn {
+      padding:5px 7px; background:var(--primary); color:#fff; border:none;
+      border-radius:6px; font-size:9px; font-weight:700; cursor:pointer;
+      font-family:inherit; text-align:center; line-height:1.5; pointer-events:all;
+    }
+    .cal-horizon-btn:hover { background:var(--primary-dark); }
+    /* Bottom bar */
+    .cal-bottombar {
+      height:var(--cal-bottom-h); background:var(--surface); border-top:1px solid var(--border);
+      display:flex; align-items:center; padding:0 14px; font-size:12px; color:var(--text-muted);
+      gap:8px; flex-shrink:0;
+    }
+    .cal-bottombar b { color:var(--text); }
+    .cb-sep { color:var(--border); font-size:14px; }
+    /* Popover */
+    #cal-pop {
+      position:fixed; background:var(--surface); border:1.5px solid var(--border);
+      border-radius:var(--radius-sm); box-shadow:var(--shadow-md);
+      padding:13px 14px; z-index:300; min-width:195px; max-width:240px; display:none;
+    }
+    #cal-pop.visible { display:block; }
+    #cal-pop-back { position:fixed; inset:0; z-index:299; display:none; }
+    #cal-pop-back.visible { display:block; }
+    .pop-title { font-size:12px; font-weight:700; margin-bottom:9px; color:var(--text); padding-left:7px; }
+    .pop-field { display:flex; flex-direction:column; gap:3px; margin-bottom:8px; }
+    .pop-lbl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint); }
+    .pop-field input {
+      padding:6px 8px; border:1.5px solid var(--border); border-radius:var(--radius-sm);
+      font-size:12px; font-family:inherit; color:var(--text); background:var(--surface);
+    }
+    .pop-field input:focus { outline:none; border-color:var(--primary); }
+    .pop-actions { display:flex; gap:5px; flex-wrap:wrap; }
+    .pop-actions button {
+      flex:1; padding:6px 8px; border-radius:6px; font-size:11px; font-weight:700;
+      cursor:pointer; font-family:inherit; border:none; min-width:54px;
+    }
+    .pop-ok  { background:var(--primary); color:#fff; }
+    .pop-ok:hover  { background:var(--primary-dark); }
+    .pop-x   { background:var(--surface-alt); color:var(--text-muted); border:1px solid var(--border) !important; }
+    .pop-del { background:#fee2e2; color:var(--red); }
+    .pop-del:hover { background:var(--red); color:#fff; }
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    #toast-el {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; color: #fff;
+      padding: 10px 22px; border-radius: 22px;
+      font-size: 14px; font-weight: 500;
+      z-index: 999; opacity: 0; transition: opacity .2s;
+      pointer-events: none; white-space: nowrap;
+    }
+    #toast-el.show { opacity: 1; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast-el"></div>
+<div id="cal-pop"></div>
+<div id="cal-pop-back" onclick="_closePopover()"></div>
+<script>
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const KEYS = {
+  weeks:      'weekflow_weeks',
+  blocks:     'weekflow_blocks',
+  categories: 'weekflow_categories',
+  workshifts: 'weekflow_workshifts',
+  settings:   'weekflow_settings',
+};
+
+const DEFAULT_CATS = [
+  { id: 'studie',      name: 'Studie',      color: '#3b82f6', weeklyFrequency: 5,   durationHours: 1,   notes: '' },
+  { id: 'sport',       name: 'Sport',       color: '#22c55e', weeklyFrequency: 3,   durationHours: 1,   notes: '' },
+  { id: 'sociaal',     name: 'Sociaal',     color: '#f97316', weeklyFrequency: 2,   durationHours: 2,   notes: '' },
+  { id: 'ontspanning', name: 'Ontspanning', color: '#a855f7', weeklyFrequency: 4,   durationHours: 1,   notes: '' },
+  { id: 'huishouden',  name: 'Huishouden',  color: '#64748b', weeklyFrequency: 3,   durationHours: 0.5, notes: '' },
+];
+
+const CUSTOM_CAT_COLORS = ['#ef4444','#eab308','#06b6d4','#10b981','#ec4899','#f97316','#8b5cf6'];
+
+const DN_SHORT  = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
+const MON_SHORT = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+const _today    = () => new Date();
+const _pad      = n  => String(n).padStart(2,'0');
+const _toISO    = d  => `${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())}`;
+const _addDays  = (d,n) => { const r = new Date(d); r.setDate(r.getDate()+n); return r; };
+const _mondayOf = d  => { const dw = d.getDay(); return _addDays(d, dw===0 ? -6 : 1-dw); };
+const _fmtDate  = d  => `${d.getDate()} ${MON_SHORT[d.getMonth()]}`;
+const _genId    = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const _esc      = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ─── Storage ──────────────────────────────────────────────────────────────────
+function _lsGet(key, fb) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch { return fb; }
+}
+function _lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+
+// ─── App state ────────────────────────────────────────────────────────────────
+let _screen      = 'start';
+let _calWeekOff  = 0;
+
+// Wizard state — reset on each new planning
+let _w = {
+  step:        1,
+  shifts:      {},    // ISO → { startHour, endHour, label }
+  catState:    {},    // id  → { enabled, weeklyFrequency, durationHours, notes }
+  customCats:  [],    // [{ id, name, color, weeklyFrequency, durationHours, notes }]
+  editingDate: null,
+};
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function nav(screen) {
+  _screen = screen;
+  _render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function navStep(step) {
+  _w.step = step;
+  _screen = 'wizard';
+  _render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+let _toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast-el');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// ─── Render dispatcher ────────────────────────────────────────────────────────
+function _render() {
+  _closePopover();
+  const app = document.getElementById('app');
+  app.className = _screen === 'calendar' ? 'cal-mode' : '';
+  if (_screen === 'start')    { app.innerHTML = _buildStart();    return; }
+  if (_screen === 'wizard')   { app.innerHTML = _buildWizard();   return; }
+  if (_screen === 'calendar') { app.innerHTML = _buildCalendar(); _initCalDragDrop(); return; }
+}
+
+// ─── Start page ───────────────────────────────────────────────────────────────
+function _buildStart() {
+  return `
+    <div class="start-wrap">
+      <div class="start-logo-icon">🗓️</div>
+      <div class="start-logo">WeekFlow</div>
+      <div class="start-sub">Slim plannen, meer gedaan</div>
+
+      <div class="start-card" onclick="_startNewPlanning()">
+        <div class="start-card-icon">📅</div>
+        <div>
+          <div class="start-card-title">Maak nieuwe planning</div>
+          <div class="start-card-sub">Stel je werkrooster en voorkeuren in</div>
+        </div>
+        <div class="start-card-arrow">›</div>
+      </div>
+
+      <div class="start-card" onclick="nav('calendar')">
+        <div class="start-card-icon">📋</div>
+        <div>
+          <div class="start-card-title">Mijn planning</div>
+          <div class="start-card-sub">Bekijk en beheer je huidige planning</div>
+        </div>
+        <div class="start-card-arrow">›</div>
+      </div>
+    </div>`;
+}
+
+function _startNewPlanning() {
+  _w = { step: 1, shifts: {}, catState: {}, customCats: [], editingDate: null };
+  // Default category state
+  DEFAULT_CATS.forEach(c => {
+    _w.catState[c.id] = {
+      enabled: c.id === 'studie' || c.id === 'sport',
+      weeklyFrequency: c.weeklyFrequency,
+      durationHours:   c.durationHours,
+      notes:           c.notes,
+    };
+  });
+  // Pre-fill shifts from saved data
+  const saved = _lsGet(KEYS.workshifts, []);
+  saved.forEach(s => { _w.shifts[s.date] = { startHour: s.startHour, endHour: s.endHour, label: s.label }; });
+  navStep(1);
+}
+
+// ─── Wizard wrapper ───────────────────────────────────────────────────────────
+function _buildWizard() {
+  // Progress bar
+  const LABELS = ['', 'Werkrooster', 'Categorieën', 'Overzicht'];
+  let prog = '<div class="progress-bar">';
+  for (let i = 1; i <= 3; i++) {
+    const cls  = i < _w.step ? 'done' : i === _w.step ? 'active' : '';
+    const icon = i < _w.step ? '✓' : i;
+    prog += `
+      <div class="progress-step">
+        <div class="progress-dot ${cls}">${icon}</div>
+        <div class="progress-label">${LABELS[i]}</div>
+      </div>`;
+    if (i < 3) prog += `<div class="progress-line${_w.step > i ? ' done' : ''}"></div>`;
+  }
+  prog += '</div>';
+
+  const backLabel  = _w.step === 1 ? 'Start'       : LABELS[_w.step - 1];
+  const backAction = _w.step === 1 ? "nav('start')" : `navStep(${_w.step - 1})`;
+
+  let stepHtml = '';
+  if (_w.step === 1) stepHtml = _buildStep1();
+  if (_w.step === 2) stepHtml = _buildStep2();
+  if (_w.step === 3) stepHtml = _buildStep3();
+
+  return `
+    <div class="screen-header">
+      <button class="back-btn" onclick="${backAction}">‹ ${_esc(backLabel)}</button>
+    </div>
+    ${prog}
+    ${stepHtml}`;
+}
+
+// ─── Step 1: Werkrooster ──────────────────────────────────────────────────────
+function _buildStep1() {
+  const t = _today();
+  let rows = '';
+
+  for (let i = 0; i < 14; i++) {
+    const d    = _addDays(t, i);
+    const iso  = _toISO(d);
+    const dow  = d.getDay();
+    const isWe = dow === 0 || dow === 6;
+    const sh   = _w.shifts[iso];
+    const isEd = _w.editingDate === iso;
+
+    let inner = '';
+    if (isEd) {
+      inner = `
+        <div class="shift-form">
+          <div class="sf-row">
+            <div class="sf-group">
+              <div class="sf-label">Van</div>
+              <input type="time" id="sf-s-${iso}" value="${sh ? sh.startHour : '09:00'}">
+            </div>
+            <div class="sf-group">
+              <div class="sf-label">Tot</div>
+              <input type="time" id="sf-e-${iso}" value="${sh ? sh.endHour : '17:00'}">
+            </div>
+            <div class="sf-group sf-group-label">
+              <div class="sf-label">Label</div>
+              <input type="text" id="sf-l-${iso}" value="${_esc(sh ? sh.label : '')}" placeholder="bijv. Werk">
+            </div>
+          </div>
+          <div class="sf-actions">
+            <button class="btn-save"   onclick="_saveShift('${iso}')">Opslaan</button>
+            <button class="btn-cancel" onclick="_cancelShiftEdit()">Annuleer</button>
+            ${sh ? `<button class="btn-del" onclick="_removeShift('${iso}')">Verwijder</button>` : ''}
+          </div>
+        </div>`;
+    }
+
+    rows += `
+      <div class="shift-row${isEd ? ' is-editing' : ''}" id="srow-${iso}">
+        <div class="shift-row-main">
+          <div class="shift-date-col">
+            <div class="shift-day-lbl${isWe ? ' weekend' : ''}">${DN_SHORT[dow]}</div>
+            <div class="shift-date-num">${_fmtDate(d)}</div>
+          </div>
+          <div class="shift-middle">
+            ${sh && !isEd
+              ? `<div class="shift-bar">
+                  <strong>${_esc(sh.label || 'Werkblok')}</strong>
+                  <span>${sh.startHour} – ${sh.endHour}</span>
+                </div>`
+              : (!isEd ? `<button class="shift-add-btn" onclick="_openShiftEdit('${iso}')">+ Voeg shift toe</button>` : '')
+            }
+          </div>
+          ${sh && !isEd ? `
+            <button class="edit-lnk"   onclick="_openShiftEdit('${iso}')">Bewerk</button>
+            <button class="icon-btn-sm" onclick="_removeShift('${iso}')">✕</button>` : ''}
+        </div>
+        ${inner}
+      </div>`;
+  }
+
+  const count = Object.keys(_w.shifts).length;
+  return `
+    <div class="screen-content">
+      <div class="step-heading">Werkrooster</div>
+      <div class="step-sub">${count > 0 ? count + ' werkblok' + (count !== 1 ? 'ken' : '') + ' ingevoerd' : 'Voeg je werkblokken toe voor de komende 2 weken'}</div>
+      <div class="shift-list">${rows}</div>
+    </div>
+    <div class="bottom-bar">
+      <button class="bottom-btn" onclick="navStep(2)">Volgende →</button>
+    </div>`;
+}
+
+function _openShiftEdit(date) {
+  _w.editingDate = date;
+  _render();
+  setTimeout(() => {
+    const el = document.getElementById('srow-' + date);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 60);
+}
+
+function _cancelShiftEdit() {
+  _w.editingDate = null;
+  _render();
+}
+
+function _saveShift(date) {
+  const s = (document.getElementById('sf-s-' + date) || {}).value;
+  const e = (document.getElementById('sf-e-' + date) || {}).value;
+  const l = (document.getElementById('sf-l-' + date) || {}).value;
+  if (!s || !e) { showToast('Vul start- en eindtijd in'); return; }
+  _w.shifts[date] = { startHour: s, endHour: e, label: (l || '').trim() || 'Werkblok' };
+  _w.editingDate = null;
+  _render();
+}
+
+function _removeShift(date) {
+  delete _w.shifts[date];
+  _w.editingDate = null;
+  _render();
+}
+
+// ─── Step 2: Categorieën ──────────────────────────────────────────────────────
+function _buildStep2() {
+  const allCats = [
+    ...DEFAULT_CATS.map(c => ({ ...c, isDefault: true })),
+    ..._w.customCats.map(c => ({ ...c, isDefault: false })),
+  ];
+
+  let cards = '';
+  allCats.forEach(cat => {
+    const cs   = _w.catState[cat.id] || { enabled: false, weeklyFrequency: cat.weeklyFrequency, durationHours: cat.durationHours, notes: '' };
+    const on   = !!cs.enabled;
+    const nameEl = cat.isDefault
+      ? `<div class="cat-name">${_esc(cat.name)}</div>`
+      : `<input class="cat-name-input" type="text" value="${_esc(cat.name)}"
+           onclick="event.stopPropagation()"
+           onchange="_updateCustomName('${cat.id}',this.value)"
+           placeholder="Naam categorie">`;
+
+    cards += `
+      <div class="cat-card${on ? ' enabled' : ''}">
+        <div class="cat-header" onclick="_toggleCat('${cat.id}')">
+          <div class="cat-dot" style="background:${cat.color}"></div>
+          ${nameEl}
+          ${on ? `<div class="cat-summary">${cs.weeklyFrequency}×/week · ${cs.durationHours}u</div>` : ''}
+          <label class="toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" ${on ? 'checked' : ''} onchange="_toggleCat('${cat.id}')">
+            <span class="toggle-track"></span>
+          </label>
+          ${!cat.isDefault
+            ? `<button class="cat-remove-btn" onclick="event.stopPropagation();_removeCustomCat('${cat.id}')">✕</button>`
+            : ''}
+        </div>
+        ${on ? `
+          <div class="cat-body">
+            <div class="cat-fields">
+              <div class="cat-field">
+                <div class="cat-field-label">Hoe vaak / week?</div>
+                <input type="number" min="1" max="14" step="1" value="${cs.weeklyFrequency}"
+                  onchange="_updateCatField('${cat.id}','weeklyFrequency',+this.value)">
+              </div>
+              <div class="cat-field">
+                <div class="cat-field-label">Duur (uren)</div>
+                <input type="number" min="0.5" max="8" step="0.5" value="${cs.durationHours}"
+                  onchange="_updateCatField('${cat.id}','durationHours',+this.value)">
+              </div>
+              <div class="cat-field cat-field-notes">
+                <div class="cat-field-label">Notities (optioneel)</div>
+                <textarea placeholder="Extra context voor AI..."
+                  onchange="_updateCatField('${cat.id}','notes',this.value)">${_esc(cs.notes || '')}</textarea>
+              </div>
+            </div>
+          </div>` : ''}
+      </div>`;
+  });
+
+  const enabledCount = allCats.filter(c => _w.catState[c.id]?.enabled).length;
+
+  return `
+    <div class="screen-content">
+      <div class="step-heading">Categorieën</div>
+      <div class="step-sub">Kies welke activiteiten je wilt plannen en stel je voorkeuren in</div>
+      <div class="cat-list">${cards}</div>
+      <button class="add-cat-btn" onclick="_addCustomCat()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Voeg eigen categorie toe
+      </button>
+    </div>
+    <div class="bottom-bar">
+      <button class="bottom-btn" onclick="navStep(3)"
+        ${enabledCount === 0 ? 'style="opacity:.5;cursor:default"' : ''}>Volgende →</button>
+    </div>`;
+}
+
+function _toggleCat(id) {
+  if (!_w.catState[id]) {
+    const cat = [...DEFAULT_CATS, ..._w.customCats].find(c => c.id === id);
+    _w.catState[id] = {
+      enabled: false,
+      weeklyFrequency: cat ? cat.weeklyFrequency : 3,
+      durationHours:   cat ? cat.durationHours   : 1,
+      notes: '',
+    };
+  }
+  _w.catState[id].enabled = !_w.catState[id].enabled;
+  _render();
+}
+
+function _updateCatField(id, field, val) {
+  if (!_w.catState[id]) _w.catState[id] = { enabled: true, weeklyFrequency: 3, durationHours: 1, notes: '' };
+  _w.catState[id][field] = val;
+}
+
+function _updateCustomName(id, name) {
+  const cat = _w.customCats.find(c => c.id === id);
+  if (cat) cat.name = name;
+}
+
+function _addCustomCat() {
+  const color = CUSTOM_CAT_COLORS[_w.customCats.length % CUSTOM_CAT_COLORS.length];
+  const id = 'custom_' + _genId();
+  const cat = { id, name: 'Nieuw', color, weeklyFrequency: 2, durationHours: 1, notes: '', isDefault: false };
+  _w.customCats.push(cat);
+  _w.catState[id] = { enabled: true, weeklyFrequency: 2, durationHours: 1, notes: '' };
+  _render();
+  setTimeout(() => {
+    const inp = document.querySelector(`input[onchange="_updateCustomName('${id}',this.value)"]`);
+    if (inp) { inp.focus(); inp.select(); }
+  }, 60);
+}
+
+function _removeCustomCat(id) {
+  _w.customCats = _w.customCats.filter(c => c.id !== id);
+  delete _w.catState[id];
+  _render();
+}
+
+// ─── Step 3: Overzicht ────────────────────────────────────────────────────────
+function _buildStep3() {
+  const shiftCount   = Object.keys(_w.shifts).length;
+  const allCats      = [...DEFAULT_CATS, ..._w.customCats];
+  const enabledCats  = allCats.filter(c => _w.catState[c.id]?.enabled);
+  let totalHoursWeek = 0;
+
+  let catRows = '';
+  enabledCats.forEach(c => {
+    const cs = _w.catState[c.id];
+    const wh = +(cs.weeklyFrequency * cs.durationHours).toFixed(1);
+    totalHoursWeek += wh;
+    catRows += `
+      <div class="overview-row">
+        <div class="ov-dot" style="background:${c.color}"></div>
+        <div style="flex:1">${_esc(c.name)}</div>
+        <div style="font-size:13px;color:var(--text-muted)">${cs.weeklyFrequency}×/week · ${cs.durationHours}u = ${wh}u</div>
+      </div>`;
+  });
+
+  return `
+    <div class="screen-content">
+      <div class="step-heading">Overzicht</div>
+      <div class="step-sub">Controleer je instellingen en kies hoe je wilt plannen</div>
+
+      <div class="overview-card">
+        <div class="overview-title">📅 Werkblokken</div>
+        <div class="overview-row">
+          <div>${shiftCount > 0
+            ? shiftCount + ' werkblok' + (shiftCount !== 1 ? 'ken' : '') + ' ingevoerd voor de komende 2 weken'
+            : 'Geen werkblokken ingevoerd'}</div>
+        </div>
+      </div>
+
+      <div class="overview-card">
+        <div class="overview-title">📂 Categorieën (${enabledCats.length} actief)</div>
+        ${catRows || '<div style="font-size:13px;color:var(--text-muted)">Geen categorieën geselecteerd</div>'}
+        ${totalHoursWeek > 0 ? `<div class="overview-total">Totaal: ~${totalHoursWeek.toFixed(1)} uur per week</div>` : ''}
+      </div>
+
+      <button class="big-btn big-btn-ai" onclick="_aiComingSoon()">
+        ✨ Genereer AI planning
+      </button>
+      <button class="big-btn big-btn-plan" onclick="_completeWizard()">
+        ➡ Zelf plannen
+      </button>
+    </div>`;
+}
+
+function _aiComingSoon() {
+  showToast('✨ AI-planning komt binnenkort!');
+}
+
+function _completeWizard() {
+  // Persist shifts
+  const shifts = Object.entries(_w.shifts).map(([date, s]) => ({ date, ...s }));
+  _lsSet(KEYS.workshifts, shifts);
+
+  // Persist categories
+  const allCats = [...DEFAULT_CATS, ..._w.customCats];
+  const cats = allCats
+    .filter(c => _w.catState[c.id]?.enabled)
+    .map(c => {
+      const cs = _w.catState[c.id];
+      return { id: c.id, name: c.name, color: c.color,
+        weeklyFrequency: cs.weeklyFrequency, durationHours: cs.durationHours, notes: cs.notes };
+    });
+  _lsSet(KEYS.categories, cats);
+
+  // Persist settings
+  _lsSet(KEYS.settings, { bufferHours: 1, planningHorizonWeeks: 2 });
+
+  nav('calendar');
+}
+
+// ─── Calendar v2 helpers ──────────────────────────────────────────────────────
+function _timeToFloat(t) {
+  const [h, m] = String(t).split(':').map(Number);
+  return h + (m || 0) / 60;
+}
+function _floatToTime(f) {
+  const h = Math.floor(f);
+  const m = Math.round((f - h) * 60);
+  return `${_pad(h)}:${_pad(m)}`;
+}
+function _checkOverlap(day, startH, dur, excludeId) {
+  const blocks = _lsGet(KEYS.blocks, []);
+  const shifts = _lsGet(KEYS.workshifts, []);
+  const endH = startH + dur;
+  for (const b of blocks) {
+    if (b.day !== day || b.isGhost || b.id === excludeId) continue;
+    if (startH < b.startHour + b.durationHours && endH > b.startHour) return true;
+  }
+  const sh = shifts.find(s => s.date === day);
+  if (sh) {
+    const sS = _timeToFloat(sh.startHour), sE = _timeToFloat(sh.endHour);
+    if (startH < sE && endH > sS) return true;
+  }
+  return false;
+}
+
+// ─── Calendar view ────────────────────────────────────────────────────────────
+let _drag = null;
+let _popCtx = null;
+
+function _buildCalendar() {
+  const t         = _today();
+  const mon       = _addDays(_mondayOf(t), _calWeekOff * 7);
+  const isoToday  = _toISO(t);
+  const horizonIso = _toISO(_addDays(t, 14));
+  const yr        = mon.getFullYear();
+  const wLabel    = `${_fmtDate(mon)} – ${_fmtDate(_addDays(mon,6))} ${yr}`;
+
+  const shifts = _lsGet(KEYS.workshifts, []);
+  const blocks = _lsGet(KEYS.blocks, []);
+  const cats   = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
+
+  // ── Top bar ──────────────────────────────────────────────────────────────
+  const topbar = `
+    <div class="cal-topbar">
+      <button class="back-btn" onclick="nav('start')">‹</button>
+      <button class="arrow-btn" onclick="_calWeek(-1)">‹</button>
+      <div class="cal-week-lbl">${_esc(wLabel)}</div>
+      <button class="arrow-btn" onclick="_calWeek(1)">›</button>
+      <button class="cal-today-btn" onclick="_calGoToday()">Vandaag</button>
+      <button class="cal-new-btn"   onclick="_startNewPlanning()">+ Planning</button>
+    </div>`;
+
+  // ── Sidebar tiles ─────────────────────────────────────────────────────────
+  let tiles = '';
+  cats.forEach(c => {
+    const dur = c.durationHours || 1;
+    tiles += `<div class="cat-tile" draggable="true" data-cat-id="${c.id}">
+      <div class="cat-tile-dot" style="background:${c.color}"></div>
+      <div class="cat-tile-name">${_esc(c.name)}</div>
+      <div class="cat-tile-dur">${dur}u</div>
+    </div>`;
+  });
+  const sidebar = `
+    <div class="cal-sidebar">
+      <div class="cal-sidebar-hdr">Blokken</div>
+      <div class="cal-tiles">
+        ${tiles || '<div class="cal-sidebar-hint">Geen categorieën. Maak eerst een planning.</div>'}
+      </div>
+      <div class="cal-sidebar-hint">Sleep een blok naar het rooster</div>
+    </div>`;
+
+  // ── Day header row ────────────────────────────────────────────────────────
+  let dhDays = '';
+  for (let i = 0; i < 7; i++) {
+    const d   = _addDays(mon, i);
+    const iso = _toISO(d);
+    dhDays += `<div class="cal-dh-day${iso === isoToday ? ' is-today' : ''}">
+      <div class="cal-dh-dn">${DN_SHORT[d.getDay()]}</div>
+      <div class="cal-dh-dd">${d.getDate()}</div>
+    </div>`;
+  }
+  const dhRow = `<div class="cal-dh-row">
+    <div class="cal-dh-spacer"></div>
+    <div class="cal-dh-days">${dhDays}</div>
+  </div>`;
+
+  // ── Time labels ───────────────────────────────────────────────────────────
+  let hourLabels = '';
+  for (let h = 0; h < 24; h++) hourLabels += `<div class="cal-hour-lbl">${_pad(h)}</div>`;
+
+  // ── Day columns ───────────────────────────────────────────────────────────
+  let dayCols = '';
+  for (let i = 0; i < 7; i++) {
+    const d      = _addDays(mon, i);
+    const iso    = _toISO(d);
+    const beyond = iso > horizonIso;
+
+    // Hour background cells
+    let hcells = '';
+    for (let h = 0; h < 24; h++) {
+      hcells += `<div class="cal-hcell${h % 2 === 0 ? '' : ' even'}" style="top:calc(${h}*var(--row-h))"></div>`;
+    }
+
+    // Work shift
+    let shiftHtml = '';
+    const sh = shifts.find(s => s.date === iso);
+    if (sh) {
+      const sS = _timeToFloat(sh.startHour), sE = _timeToFloat(sh.endHour);
+      const dur = sE - sS;
+      shiftHtml = `<div class="cal-shift"
+        style="top:calc(${sS}*var(--row-h));height:calc(${dur}*var(--row-h))"
+        title="${_esc(sh.label||'Werk')}: ${sh.startHour}–${sh.endHour}">
+        ${_esc(sh.label||'Werk')}</div>`;
+    }
+
+    // Activity blocks
+    let blockHtml = '';
+    blocks.filter(b => b.day === iso && !b.isGhost).forEach(b => {
+      const cat   = cats.find(c => c.id === b.category);
+      const color = cat ? cat.color : '#94a3b8';
+      const label = b.name || (cat ? cat.name : 'Blok');
+      const endT  = _floatToTime(b.startHour + b.durationHours);
+      const showTime = b.durationHours >= 0.75;
+      blockHtml += `<div class="cal-block" data-block-id="${b.id}" draggable="true"
+        style="top:calc(${b.startHour}*var(--row-h));height:calc(${b.durationHours}*var(--row-h));border-left-color:${color};background:${color}1a">
+        <div class="cal-block-name">${_esc(label)}</div>
+        ${showTime ? `<div class="cal-block-time">${_floatToTime(b.startHour)}–${endT}</div>` : ''}
+      </div>`;
+    });
+
+    // Horizon overlay
+    const horizonOverlay = beyond ? `
+      <div class="cal-horizon-overlay">
+        <button class="cal-horizon-btn" onclick="_startNewPlanning()">+ Planning<br>toevoegen</button>
+      </div>` : '';
+
+    dayCols += `<div class="cal-day-col${beyond ? ' beyond' : ''}" data-iso="${iso}">
+      <div class="cal-day-body" data-day="${iso}">${hcells}${shiftHtml}${blockHtml}</div>
+      ${horizonOverlay}
+    </div>`;
+  }
+
+  // ── Bottom bar stats ──────────────────────────────────────────────────────
+  const weekIsos    = Array.from({length:7}, (_,i) => _toISO(_addDays(mon,i)));
+  const weekBlocks  = blocks.filter(b => weekIsos.includes(b.day) && !b.isGhost);
+  const blkHours    = weekBlocks.reduce((s,b) => s + b.durationHours, 0);
+  const shiftHoursW = shifts.filter(s => weekIsos.includes(s.date))
+    .reduce((s,sh) => s + _timeToFloat(sh.endHour) - _timeToFloat(sh.startHour), 0);
+  const freeH = Math.max(0, 7*16 - blkHours - shiftHoursW);
+
+  const bottombar = `<div class="cal-bottombar">
+    <b>${weekBlocks.length}</b> blokken
+    <span class="cb-sep">·</span>
+    <b>${blkHours.toFixed(1)}u</b> activiteiten
+    <span class="cb-sep">·</span>
+    ~<b>${freeH.toFixed(0)}u</b> vrije tijd
+  </div>`;
+
+  return `<div class="cal-container">
+    ${topbar}
+    <div class="cal-body">
+      ${sidebar}
+      <div class="cal-content">
+        ${dhRow}
+        <div class="cal-grid-area">
+          <div class="cal-time-col">${hourLabels}</div>
+          <div class="cal-days-wrap">${dayCols}</div>
+        </div>
+      </div>
+    </div>
+    ${bottombar}
+  </div>`;
+}
+
+function _calGoToday() { _calWeekOff = 0; _render(); }
+function _calWeek(dir) { _calWeekOff += dir; _render(); }
+
+// ─── Drag & Drop ──────────────────────────────────────────────────────────────
+function _initCalDragDrop() {
+  // Category tiles → drag source
+  document.querySelectorAll('.cat-tile[data-cat-id]').forEach(tile => {
+    tile.addEventListener('dragstart', e => {
+      _drag = { type: 'cat', catId: tile.dataset.catId };
+      e.dataTransfer.effectAllowed = 'copy';
+      setTimeout(() => tile.classList.add('dragging'), 0);
+    });
+    tile.addEventListener('dragend', () => tile.classList.remove('dragging'));
+  });
+
+  // Existing blocks → drag + click
+  document.querySelectorAll('.cal-block[data-block-id]').forEach(blk => {
+    blk.addEventListener('dragstart', e => {
+      _drag = { type: 'block', blockId: blk.dataset.blockId };
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => blk.classList.add('dragging'), 0);
+    });
+    blk.addEventListener('dragend', () => blk.classList.remove('dragging'));
+    blk.addEventListener('click', e => {
+      e.stopPropagation();
+      _showEditPopover(blk.dataset.blockId, e.clientX, e.clientY);
+    });
+  });
+
+  // Day bodies → drop targets
+  document.querySelectorAll('.cal-day-body[data-day]').forEach(body => {
+    body.addEventListener('dragover', e => {
+      if (!_drag) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = _drag.type === 'cat' ? 'copy' : 'move';
+      body.classList.add('drag-over');
+    });
+    body.addEventListener('dragleave', e => {
+      if (!e.relatedTarget || !body.contains(e.relatedTarget))
+        body.classList.remove('drag-over');
+    });
+    body.addEventListener('drop', e => {
+      e.preventDefault();
+      body.classList.remove('drag-over');
+      if (!_drag) return;
+      const rect = body.getBoundingClientRect();
+      const rawH = (e.clientY - rect.top) / (body.offsetHeight / 24);
+      const hour = Math.max(0, Math.min(23.5, Math.round(rawH * 2) / 2)); // snap 30min
+      const day  = body.dataset.day;
+      if (_drag.type === 'cat')   _showAddPopover(day, hour, _drag.catId, e.clientX, e.clientY);
+      if (_drag.type === 'block') _moveBlock(_drag.blockId, day, hour);
+      _drag = null;
+    });
+  });
+}
+
+// ─── Popover ──────────────────────────────────────────────────────────────────
+function _closePopover() {
+  const pop  = document.getElementById('cal-pop');
+  const back = document.getElementById('cal-pop-back');
+  if (pop)  pop.classList.remove('visible');
+  if (back) back.classList.remove('visible');
+  _popCtx = null;
+}
+
+function _openPopover(html, x, y) {
+  const pop  = document.getElementById('cal-pop');
+  const back = document.getElementById('cal-pop-back');
+  pop.innerHTML = html;
+  pop.classList.add('visible');
+  back.classList.add('visible');
+  setTimeout(() => {
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let left = x + 12, top = y - 10;
+    if (left + pw > window.innerWidth  - 8) left = x - pw - 12;
+    if (top  + ph > window.innerHeight - 8) top  = window.innerHeight - ph - 8;
+    pop.style.left = Math.max(6, left) + 'px';
+    pop.style.top  = Math.max(6, top)  + 'px';
+  }, 0);
+}
+
+function _showAddPopover(day, startHour, catId, x, y) {
+  const cats = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
+  const cat  = cats.find(c => c.id === catId);
+  if (!cat) return;
+  _popCtx = { type: 'add', day, startHour, catId };
+  _openPopover(`
+    <div class="pop-title" style="border-left:3px solid ${cat.color}">${_esc(cat.name)} toevoegen</div>
+    <div class="pop-field">
+      <div class="pop-lbl">Naam</div>
+      <input id="pop-name" type="text" value="${_esc(cat.name)}" placeholder="Naam">
+    </div>
+    <div class="pop-field">
+      <div class="pop-lbl">Starttijd</div>
+      <input id="pop-time" type="time" value="${_floatToTime(startHour)}">
+    </div>
+    <div class="pop-field">
+      <div class="pop-lbl">Duur (uren)</div>
+      <input id="pop-dur" type="number" min="0.5" max="8" step="0.5" value="${cat.durationHours || 1}">
+    </div>
+    <div class="pop-actions">
+      <button class="pop-ok" onclick="_confirmAdd()">Toevoegen</button>
+      <button class="pop-x"  onclick="_closePopover()">Annuleer</button>
+    </div>`, x, y);
+  setTimeout(() => { const i = document.getElementById('pop-name'); if (i) { i.focus(); i.select(); } }, 40);
+}
+
+function _confirmAdd() {
+  if (!_popCtx || _popCtx.type !== 'add') return;
+  const name     = (document.getElementById('pop-name') || {}).value || '';
+  const timeVal  = (document.getElementById('pop-time') || {}).value;
+  const dur      = +((document.getElementById('pop-dur') || {}).value) || 1;
+  const startHour = _timeToFloat(timeVal || _floatToTime(_popCtx.startHour));
+  if (_checkOverlap(_popCtx.day, startHour, dur)) {
+    showToast('⚠️ Overlapt met bestaand blok of werkshift');
+    return;
+  }
+  const blocks = _lsGet(KEYS.blocks, []);
+  blocks.push({ id: _genId(), day: _popCtx.day, startHour, durationHours: dur, category: _popCtx.catId, name: name.trim() });
+  _lsSet(KEYS.blocks, blocks);
+  _closePopover();
+  _render();
+}
+
+function _showEditPopover(blockId, x, y) {
+  const blocks = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === blockId);
+  if (!b) return;
+  const cats  = _lsGet(KEYS.categories, null) || DEFAULT_CATS;
+  const cat   = cats.find(c => c.id === b.category);
+  const color = cat ? cat.color : '#94a3b8';
+  _popCtx = { type: 'edit', blockId };
+  _openPopover(`
+    <div class="pop-title" style="border-left:3px solid ${color}">${_esc(b.name || (cat ? cat.name : 'Blok'))} bewerken</div>
+    <div class="pop-field">
+      <div class="pop-lbl">Naam</div>
+      <input id="pop-name" type="text" value="${_esc(b.name || '')}" placeholder="Naam">
+    </div>
+    <div class="pop-field">
+      <div class="pop-lbl">Starttijd</div>
+      <input id="pop-time" type="time" value="${_floatToTime(b.startHour)}">
+    </div>
+    <div class="pop-field">
+      <div class="pop-lbl">Duur (uren)</div>
+      <input id="pop-dur" type="number" min="0.5" max="8" step="0.5" value="${b.durationHours}">
+    </div>
+    <div class="pop-actions">
+      <button class="pop-ok"  onclick="_confirmEdit()">Opslaan</button>
+      <button class="pop-del" onclick="_deleteBlock()">Verwijder</button>
+      <button class="pop-x"   onclick="_closePopover()">✕</button>
+    </div>`, x, y);
+}
+
+function _confirmEdit() {
+  if (!_popCtx || _popCtx.type !== 'edit') return;
+  const name      = (document.getElementById('pop-name') || {}).value || '';
+  const timeVal   = (document.getElementById('pop-time') || {}).value;
+  const dur       = +((document.getElementById('pop-dur') || {}).value) || 1;
+  const startHour = _timeToFloat(timeVal);
+  const blocks    = _lsGet(KEYS.blocks, []);
+  const b         = blocks.find(bl => bl.id === _popCtx.blockId);
+  if (!b) return;
+  if (_checkOverlap(b.day, startHour, dur, _popCtx.blockId)) {
+    showToast('⚠️ Overlapt met bestaand blok of werkshift');
+    return;
+  }
+  b.name = name.trim();
+  b.startHour = startHour;
+  b.durationHours = dur;
+  _lsSet(KEYS.blocks, blocks);
+  _closePopover();
+  _render();
+}
+
+function _deleteBlock() {
+  if (!_popCtx || _popCtx.type !== 'edit') return;
+  const blocks = _lsGet(KEYS.blocks, []);
+  _lsSet(KEYS.blocks, blocks.filter(b => b.id !== _popCtx.blockId));
+  _closePopover();
+  _render();
+}
+
+function _moveBlock(blockId, day, startHour) {
+  const blocks = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === blockId);
+  if (!b) return;
+  if (_checkOverlap(day, startHour, b.durationHours, blockId)) {
+    showToast('⚠️ Kan niet verplaatsen — overlapt met bestaand blok of shift');
+    return;
+  }
+  b.day = day;
+  b.startHour = startHour;
+  _lsSet(KEYS.blocks, blocks);
+  _render();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+function _init() {
+  // Ensure base data model exists
+  if (!_lsGet(KEYS.settings, null)) {
+    _lsSet(KEYS.settings, { bufferHours: 1, planningHorizonWeeks: 2 });
+  }
+  if (!_lsGet(KEYS.blocks, null)) {
+    _lsSet(KEYS.blocks, []);
+  }
+  if (!_lsGet(KEYS.weeks, null)) {
+    _lsSet(KEYS.weeks, []);
+  }
+  _render();
+}
+
+_init();
+</script>
+</body>
+</html>

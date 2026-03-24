@@ -1,8 +1,8 @@
 # Marketing Analyse App — Savestate
 
 ## Laatste opslag
-**Datum:** 2026-03-23
-**Commit hash:** `8e7d8bf`
+**Datum:** 2026-03-24
+**Commit hash:** *(zie hieronder na push)*
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
 
@@ -10,7 +10,65 @@
 
 ## Samenvatting recente wijzigingen
 
-### Sessie 2026-03-23 — 3 grote uitbreidingen
+### Sessie 2026-03-24 — WeekFlow: volledig kalenderscherm
+
+#### Nieuw project: WeekFlow (`WeekFlow/weekflow.html`)
+Volledig herontwikkelde kalenderweergave als de kern van de app.
+
+**Layout & structuur:**
+- Volledig schermvullend (`height: 100vh; overflow: hidden`), `#app.cal-mode { max-width: 100% }`
+- Top bar: ‹ terug | ‹ week | datumbereik | week › | Vandaag | + Planning
+- Linker sidebar (152px): sleep-tegels per actieve categorie (kleurstip, naam, standaardduur)
+- Rechts: dagkolommenrij (44px) + uurlabels (34px breed) + 7 dagkolommen
+- Rijhoogte = `(100vh − 140px) / 24` via CSS-variabele `--row-h` — geen JS nodig, past exact op scherm
+- Onderbalk: aantal blokken, uren activiteiten, geschatte vrije tijd
+
+**Drag & Drop:**
+- Sleep categorie-tegel → dagkolom → popover vraagt naam, starttijd, duur (vooringevuld met categorie-defaults)
+- Sleep bestaand blok → verplaatsen (snapt op 30 minuten)
+- Overlappingsdetectie tegen bestaande blokken én werkshifts (`_checkOverlap`)
+
+**Blokken in het rooster:**
+- Werkshifts: gestreept blauw patroon, niet-sleepbaar, absoluut gepositioneerd op werkelijke tijd
+- Activiteitblokken: kleur-tinted achtergrond met gekleurde linkerrand, naam + tijdsbereik
+- Klik op blok → bewerkpopover: naam / tijd / duur velden + verwijderknop
+
+**Horizon-overlay:**
+- Dagen > 14 dagen vooruit: 40% doorzichtig + gecentreerde knop "Planning toevoegen" (herstart wizard)
+
+**Nieuwe functies (JS):**
+- `_timeToFloat()`, `_floatToTime()` — conversie tijdstring ↔ decimaal getal
+- `_checkOverlap()` — overlappingsdetectie blokken + shifts
+- `_buildCalendar()` — herbouwd van nul; genereert volledige HTML-structuur
+- `_calGoToday()`, `_calWeek()` — weeknavigatie
+- `_initCalDragDrop()` — koppelt dragstart/dragover/drop listeners na render
+- `_closePopover()`, `_openPopover()` — popover lifecycle
+- `_showAddPopover()`, `_confirmAdd()` — nieuw blok toevoegen
+- `_showEditPopover()`, `_confirmEdit()`, `_deleteBlock()` — blok bewerken/verwijderen
+- `_moveBlock()` — blok verplaatsen via drag
+
+**Overig:**
+- `.gitignore` aangemaakt (sluit `.claude/` uit)
+- `#cal-pop` + `#cal-pop-back` toegevoegd aan body (popover-elementen buiten `#app`)
+- `_render()` stelt `cal-mode` klasse in op `#app` en roept `_initCalDragDrop()` aan
+
+---
+
+### Sessie 2026-03-24 — WeekFlow: volledige herschrijving (startpagina + wizard)
+
+Eerder in dezelfde dag: complete herstart van `WeekFlow/weekflow.html`.
+
+- **Startpagina**: twee grote kaartjes (📅 Nieuwe planning / 📋 Mijn planning)
+- **3-staps wizard**: Werkrooster (14-daags shift-editor) → Categorieën (toggle + velden) → Overzicht
+- **Stap 1** — inline shift-editor per dag, één rij tegelijk bewerkbaar
+- **Stap 2** — CSS toggle-switch kaartjes, uitklapbare velden per ingeschakelde categorie, eigen categorieën toevoegen
+- **Stap 3** — samenvatting + "Genereer AI planning" (→ toast "komt binnenkort") + "Zelf plannen" (→ kalender)
+- **Kalender** (stub, nu vervangen) — weekrooster met shift-pills en blok-pills
+- **Tech**: vanilla JS SPA, localStorage, geen build tool
+
+---
+
+### Sessie 2026-03-23 — 3 grote uitbreidingen (marketing-analyse.html)
 
 #### 1. Samenvattingspagina — alles klikbaar
 - **DCard** — optionele `onClick` prop; hover:border-gray-300 + hover:shadow-md + ↗ pijl rechtsonder
@@ -37,95 +95,38 @@
 - **Legende** — eigen merk met gestippelde kleurlijn en klantnaam
 - **PageConcurrentie + DashboardScreen** — `analysis` prop doorgegeven aan radar
 
-### Sessie 2026-03-23 — Export modal
-
-#### Exportfunctionaliteit herbouwd
-1. **ExportModal component** — Modaal venster dat opent bij klik op "Exporteer"-knop in de dashboard header
-2. **Selectieopties** — "Volledige analyse" (alles); individuele checkboxes: Samenvatting, Interne Analyse (volledig), Externe Analyse (volledig), Persona's
-3. **Individuele secties uitklapbaar** — Accordeon-sectie met Intern (9 secties) en Extern (5 secties) afzonderlijk aanvinkbaar
-4. **Formaatkeuze** — PDF of JSON toggle; exporteer-knop uitgeschakeld als niets geselecteerd
-5. **exportPDFFiltered()** — Bouwt alleen geselecteerde secties; klantnaam + datum in header; page-break tussen elke sectie; Persona's als opgemaakte kaartjes
-6. **exportJSONFiltered()** — Filtert analyse-object op geselecteerde secties; aiSwot meegegeven bij SWOT-selectie
-7. **DashboardScreen** — Split-knop (PDF + ▾ dropdown) vervangen door één "Exporteer"-knop; `showExportMenu`/`exportMenuRef` verwijderd
-
-### Sessie 2026-03-23 — 4 grote uitbreidingen
-
-#### 1. Teamstructuur invoerflow
-1. **emptyTeamlid** — Nieuw datashape `{naam, functietitel, rol, isLeader}` per teamlid
-2. **TeamEditor component** — Gestructureerd formulier met "Voeg teamlid toe"-knop; max 10 leden; checkbox per lid voor teamleader-aanwijzing; verwijderknop
-3. **OrgChart redesign** — Leider bovenaan met naam + functietitel (donkere bubbel); rest in rij eronder; rol als klein grijs label rechts van elke bubbel; SVG verbindingslijnen; gestippelde lijn naar beslissingsproces-blok; backward-compat fallback naar oude tekstvelden
-4. **Migratie** — `migrateAnalysis()` behoudt `teamleden` array bij herlaad van oude opgeslagen data
-
-#### 2. Concurrentieanalyse radardiagram
-5. **scoreTextVeld()** — Scoort tekstveld 1–5 op basis van positieve/negatieve sleutelwoorden
-6. **erToRadarScore()** — Converteert ER-percentage naar score 1–5
-7. **ConcurrentieRadar** — SVG penta-radardiagram (5 assen: positionering, content, community, engagement, differentiatie); kleurlijn per concurrent; legende + toelichting; boven de bestaande vergelijkingstabel
-
-#### 3. Samenvattingspagina uitbreiding
-8. **Benchmark ER** — In de ER-kaart: pijl omhoog (groen) of omlaag (oranje) met "Beste concurrent: X%" wanneer concurrent ER beschikbaar
-9. **Marktcontext sectie** — Na doelgroep-kaart: twee kleurgecodeerde badges (groeiend/verzadigd/krimpend/stabiel) voor marktgrootte en marktverzadiging
-10. **Middelen sectie** — Na marktcontext: budget en tijd als kaartjes; oranje waarschuwing onder €500/maand of onder 5 uur/week
-
-#### 4. Sectiegezondheidsscores
-11. **computeSectionHealth()** — Telt positieve vs totale badges in een sectie
-12. **SectionHealthBadge component** — Toont "X/Y" badge naast sectietitel; groen als alles positief, rood als alles negatief, oranje anders
-13. **Badges toegevoegd aan** — Alle 9 interne en externe dashboard-secties: Merkidentiteit, Kanaalstrategie, Doelgroep, Strategische content, Community, Concurrentie, Samenwerkingen, Markt/Scene, Doelgroepgedrag, Culturele trends
-
-### Commit 38f8d22 — SWOT vergelijking visueel verbeterd
-1. **Vergelijkingskaartjes** — Elk verschil in een eigen afgebakend kaartje met titel en bodytekst
-2. **Gekleurde streep** — Oranje = AI kritischer, blauw = AI ziet extra kans
-3. **parseVergelijking()** — Verwerkt zowel nieuw JSON-array als legacy string-formaat
-
-### Commit 3661b1c — Persona generator uitbreiding + samenvattingspagina redesign
-
-#### Persona tabs (4 tabs per kaart)
-4. **Profiel** — Bestaande inhoud (naam, bio, quote, motivaties, frustraties, mediagebruik, koopgedrag)
-5. **Customer Journey** — 5 fases (Ontdekking→Terugkeer), elk met beschrijving + voorbeeld, kleurcodering per fase
-6. **Kanaaladvies** — Platform-kaartjes met prioriteit-badge (primair/secundair/optioneel), reden/content/timing
-7. **Doelgroepvergelijking** — Overeenkomsten (groen), verschillen (rood), conclusie (amber)
-
-#### Persona generator uitbreiding (3+1 persona's)
-8. **Kernklant (persona1)** — Gebaseerd op werkelijke doelgroep
-9. **Aspirationele klant (persona2)** — Gebaseerd op gewenste doelgroep
-10. **Randgeval (persona3)** — Verrassend segment via merkidentiteit + trends + concurrentie
-11. **Conflictpersona (persona4)** — Automatisch bij doelgroepkloof (gewenst ≠ werkelijk); oranje banner
-12. **buildPersonaPrompt** — Expliciete rollen per persona, geen twee mogen gelijken; merkwaarden + concurrenten als extra context; maxTokens 6000
-13. **Persona-ID's** — `id="persona-card-{key}"` voor scrollnavigatie vanuit samenvatting
-
-#### Samenvattingspagina redesign
-14. **Gezondheidscore A–F** — Bovenaan, 4 factoren: community/ER/contentmix/doelgroepkloof; groen/oranje/rood; factor-badges ✓/✗; tooltip
-15. **MiniDonutChart** — Volledige donut (100×100px) vervangt dominante-categorie-tekst; alle categorieën + percentages
-16. **Doelgroep compact** — Kleinere blokken met line-clamp; mismatch-waarschuwing groter, prominenter, met uitlegtekst
-17. **SWOT highlights verwijderd** — Top sterktes/bedreigingen weg van samenvattingspagina
-18. **Persona snellinks** — Klikbare kaartjes onderaan; navigeert naar personas-tab + scrollt naar betreffende kaart
-
 ---
 
 ## Huidige projectstatus
 
-### Bestand
+### Bestanden
 - `marketing-analyse.html` — Enkelvoudig HTML-bestand (React + Tailwind via CDN)
+- `WeekFlow/weekflow.html` — Enkelvoudig HTML-bestand (Vanilla JS, geen framework)
 
-### Features actief
+### marketing-analyse.html — Features actief
 - Multi-client analyse beheer (aanmaken, opslaan, openen, verwijderen)
 - Export modal: selecteerbare secties (samenvatting, interne/externe/persona's/individueel), PDF of JSON formaat
-- Samenvattingspagina: gezondheidscore A–F, mini-donut contentmix, doelgroep compact, persona snellinks, benchmark ER (concurrent vergelijking), marktcontext badges, middelen kaartjes
+- Samenvattingspagina: gezondheidscore A–F, mini-donut contentmix, doelgroep compact, persona snellinks, benchmark ER, marktcontext badges, middelen kaartjes
 - Interne analyse: Organisatie (SVG OrgChart + TeamEditor), Merkidentiteit, Kanalen, Doelgroep, Content, Strategie, Community, Middelen, SWOT
 - Externe analyse: Concurrentie (radardiagram + vergelijkingstabel), Samenwerkingen, Markt/Scene, Doelgroepgedrag, Trends
-- Dashboard: badges + tooltips, IconDataCards, tag-chips, SVG organogram, performance metrics, sectiegezondheidsscores (X/Y)
-- Visueel: donut contentmix, format-balken, doelgroep vergelijking, community score-meter, penta-radardiagram concurrenten
-- Automatische inzichten: 9 data-verbindingen, 3 kleurtypen, teller bovenaan
-- Engagement rate: uitsluitend automatisch berekend (Insights/bereik of publiek/volgers)
-- Concurrent ER: automatisch via publieke formule (likes + comments) / volgers
-- Persona Creator: 3 standaard persona's + optionele conflictpersona via Anthropic API
-  - 4 tabs per kaart: Profiel, Customer Journey, Kanaaladvies, Doelgroepvergelijking
-  - Refresh per persona; persistentie in analyseobject
-- AI SWOT: parallelle analyse naast handmatige SWOT met vergelijkingsnoot (gestructureerde kaartjes)
+- Persona Creator: 3 standaard + optionele conflictpersona via Anthropic API (4 tabs per kaart)
+- AI SWOT: parallelle analyse naast handmatige SWOT (gestructureerde kaartjes)
 - LocalStorage persistentie met automatische migratie
 
+### WeekFlow/weekflow.html — Features actief
+- Startpagina met twee navigatiekaartjes
+- 3-staps wizard: werkrooster (14 dagen) → categorieën → overzicht
+- Kalender: volledig schermvullende weekweergave met drag & drop
+  - Sidebar met sleepbare categorie-tegels
+  - 24-uur tijdrooster, 7 dagkolommen, past exact op scherm
+  - Werkshifts automatisch gerenderd (gestreept patroon)
+  - Blokken toevoegen/verplaatsen/bewerken/verwijderen via drag & drop + popover
+  - Overlappingsdetectie (blokken + shifts)
+  - Horizon-overlay voor weken > 14 dagen vooruit
+  - Onderbalk met statistieken
+- AI-planning: toast "komt binnenkort" (nog te implementeren)
+- LocalStorage persistentie (keys: weekflow_weeks/blocks/categories/workshifts/settings)
+
 ### Tech stack
-- React 18 (UMD via unpkg)
-- Tailwind CSS (CDN)
-- Babel Standalone (JSX in browser)
-- Anthropic API (claude-sonnet-4-20250514, directe browser-fetch)
-- Geen build tool, geen dependencies
+- **marketing-analyse.html**: React 18 (UMD), Tailwind CSS (CDN), Babel Standalone, Anthropic API
+- **WeekFlow**: Vanilla JS SPA, localStorage, geen build tool, geen dependencies
