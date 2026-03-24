@@ -2,52 +2,36 @@
 
 Lokale weekplanner met AI-planning via de Anthropic API.
 
-## Vereisten
+## Deployen op Netlify
 
-- Node.js 18 of hoger
-- Een Anthropic API-sleutel
-
-## Starten
-
-1. Stel je API-sleutel in als omgevingsvariabele:
-
-   **Windows (Command Prompt)**
+1. Verbind deze repository met Netlify (via de Netlify-dashboard of CLI)
+2. Stel de omgevingsvariabele in via **Site settings → Environment variables**:
    ```
-   set ANTHROPIC_API_KEY=sk-ant-...
+   ANTHROPIC_API_KEY = sk-ant-...
    ```
+3. Deploy — Netlify detecteert `netlify.toml` automatisch
 
-   **Windows (PowerShell)**
-   ```
-   $env:ANTHROPIC_API_KEY="sk-ant-..."
-   ```
+De redirect `/api/chat → /.netlify/functions/chat` zorgt dat de API-sleutel
+nooit in de browser terechtkomt.
 
-   **macOS / Linux**
-   ```
-   export ANTHROPIC_API_KEY=sk-ant-...
-   ```
+## Lokaal draaien (Netlify CLI)
 
-2. Start de server vanuit de `WeekFlow` map:
+```
+npm install -g netlify-cli
+ANTHROPIC_API_KEY=sk-ant-... netlify dev
+```
 
-   ```
-   node server.js
-   ```
+Open: `http://localhost:8888`
 
-   Of via npm:
+## Projectstructuur
 
-   ```
-   npm start
-   ```
-
-3. Open de app in je browser:
-
-   ```
-   http://localhost:3000
-   ```
-
-## Hoe het werkt
-
-De server doet twee dingen:
-
-- `GET /` — serveert `weekflow.html`
-- `POST /api/chat` — proxyt verzoeken naar de Anthropic API en voegt de API-sleutel
-  toe aan de headers (zodat de sleutel nooit in de browser terechtkomt)
+```
+WeekFlow/
+  index.html               # de app
+  netlify.toml             # build- en redirectconfiguratie
+  netlify/
+    functions/
+      chat.js              # serverless proxy naar Anthropic API
+  server.js                # alternatief: standalone Node.js server
+  package.json
+```
