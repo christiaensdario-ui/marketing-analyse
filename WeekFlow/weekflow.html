@@ -568,9 +568,13 @@
     }
 
     /* ── Ghost blocks ────────────────────────────────────────── */
-    .cal-block.is-ghost { opacity:.55; border-style:dashed !important; cursor:pointer; }
-    .cal-block.is-ghost.overloaded { opacity:.85; }
-    .ghost-warn { font-size:7px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .cal-block.is-ghost {
+      opacity:.5; border-style:dashed !important; cursor:pointer;
+      animation: ghost-pulse 2.5s ease-in-out infinite;
+    }
+    .ghost-label { font-size:7px; font-weight:700; color:var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ghost-shifted { font-size:7px; font-weight:700; color:#f97316; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    @keyframes ghost-pulse { 0%,100%{ opacity:.5; } 50%{ opacity:.8; } }
 
     /* ── Overbooking modal ───────────────────────────────────── */
     #ob-modal {
@@ -1674,16 +1678,11 @@ function _buildCalendar() {
     blocks.filter(b => b.day === iso && b.isGhost).forEach(b => {
       const cat   = cats.find(c => c.id === b.category);
       const color = cat ? cat.color : '#94a3b8';
-      const overloaded = _isDayFull(iso);
-      const ghostStyle = overloaded
-        ? `border-left-color:#f97316;background:rgba(249,115,22,.12)`
-        : `border-left-color:${color};background:${color}1a`;
-      blockHtml += `<div class="cal-block is-ghost${overloaded ? ' overloaded' : ''}" data-ghost-id="${b.id}"
-        style="top:calc(${b.startHour}*var(--row-h));height:calc(${b.durationHours}*var(--row-h));${ghostStyle}">
-        <div class="cal-block-name">❓ ${_esc(b.name)}</div>
-        <div class="ghost-warn" style="color:${overloaded ? '#f97316' : 'var(--text-faint)'}">
-          ${overloaded ? '⚠️ Overbelast' : 'Bevestig ›'}
-        </div>
+      blockHtml += `<div class="cal-block is-ghost" draggable="true" data-ghost-id="${b.id}"
+        style="top:calc(${b.startHour}*var(--row-h));height:calc(${b.durationHours}*var(--row-h));border-left-color:${color};background:${color}1a">
+        <div class="cal-block-name">✓ ${_esc(b.name)}</div>
+        <div class="ghost-label">Ingepland</div>
+        ${b.isShifted ? `<div class="ghost-shifted">Verschoven — geen vrije tijd</div>` : ''}
       </div>`;
     });
 
@@ -1808,8 +1807,23 @@ function _initCalDragDrop() {
     });
   });
 
-  // Ghost blocks → click to confirm/move
+  // Ghost blocks → drag + click
   document.querySelectorAll('.cal-block[data-ghost-id]').forEach(blk => {
+    blk.addEventListener('dragstart', e => {
+      if (_resizeState) { e.preventDefault(); return; }
+      _drag = { type: 'block', blockId: blk.dataset.ghostId };
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => blk.classList.add('dragging'), 0);
+    });
+    blk.addEventListener('dragend', () => {
+      blk.classList.remove('dragging');
+      _clearDropHighlight();
+      if (_pendingShake === blk.dataset.ghostId) {
+        _pendingShake = null;
+        blk.classList.add('is-shaking');
+        blk.addEventListener('animationend', () => blk.classList.remove('is-shaking'), { once: true });
+      }
+    });
     blk.addEventListener('click', e => {
       e.stopPropagation();
       _openGhostPopover(blk.dataset.ghostId, e.clientX, e.clientY);
@@ -2076,6 +2090,7 @@ function _moveBlock(blockId, day, startHour) {
   }
   b.day = day;
   b.startHour = startHour;
+  if (b.isGhost) b.isShifted = false; // user chose this slot — clear the shifted badge
   _lsSet(KEYS.blocks, blocks);
   _render();
   _checkOverbooking(day, blockId);
@@ -2159,25 +2174,44 @@ function _confirmStudyAdd() {
   _checkOverbooking(saveDay, saveId);
 }
 
+// Returns { day, startHour, shifted } — first free slot at/after preferredHour that day,
+// falling back to next day at preferredHour if the entire day is blocked.
+function _findAvailableSlot(targetDay, preferredHour, dur) {
+  if (!_checkOverlap(targetDay, preferredHour, dur)) {
+    return { day: targetDay, startHour: preferredHour, shifted: false };
+  }
+  // Search same day in 30-min increments from 6:00 to end-of-day
+  for (let h = 6; h <= 23 - dur + 0.001; h += 0.5) {
+    if (Math.abs(h - preferredHour) < 0.01) continue;
+    if (!_checkOverlap(targetDay, h, dur)) {
+      return { day: targetDay, startHour: h, shifted: true };
+    }
+  }
+  // No slot on targetDay — use next day at preferred hour
+  const nextDay = _toISO(_addDays(new Date(targetDay + 'T12:00:00'), 1));
+  return { day: nextDay, startHour: preferredHour, shifted: true };
+}
+
 function _placeGhostBlocks(block) {
   if (block.category !== 'studie' || block.isGhost) return;
   const blocks = _lsGet(KEYS.blocks, []);
   const num = block.sessienummer || 1;
   const mkGhost = (dayOff, gNum) => {
     const info = _getSessionInfo(gNum);
+    const targetDay = _toISO(_addDays(new Date(block.day + 'T12:00:00'), dayOff));
+    const slot = _findAvailableSlot(targetDay, block.startHour, info.durHours);
     blocks.push({
       id: _genId(),
-      day: _toISO(_addDays(new Date(block.day + 'T12:00:00'), dayOff)),
-      startHour: block.startHour, durationHours: info.durHours,
+      day: slot.day, startHour: slot.startHour, durationHours: info.durHours,
       category: 'studie', name: block.vaknaam + ' — ' + info.type,
       vaknaam: block.vaknaam, sessienummer: gNum, sessionType: info.type,
-      isGhost: true, done: false, parentBlockId: block.id,
+      isGhost: true, isShifted: slot.shifted, done: false, parentBlockId: block.id,
     });
+    _lsSet(KEYS.blocks, blocks); // write after each ghost so next one sees it in overlap check
   };
   if (num === 1) { mkGhost(1, 2); }
   else if (num === 2) { mkGhost(2, 3); }
-  else if (num === 3) { mkGhost(3, 4); mkGhost(10, 4); }
-  _lsSet(KEYS.blocks, blocks);
+  else if (num === 3) { mkGhost(3, 4); mkGhost(7, 4); }
 }
 
 // ─── Ghost confirm ────────────────────────────────────────────────────────────
@@ -2190,17 +2224,10 @@ function _openGhostPopover(ghostId, x, y) {
   const color = cat ? cat.color : '#94a3b8';
   _popCtx = { type: 'ghost', ghostId };
   _openPopover(`
-    <div class="pop-title" style="border-left:3px solid ${color}">❓ ${_esc(b.name)}</div>
-    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
-      Automatisch ingepland · ${_esc(b.day)} · ${_floatToTime(b.startHour)}
-    </div>
-    <div class="pop-field">
-      <div class="pop-lbl">Dag</div>
-      <input id="pop-ghost-day" type="date" value="${b.day}">
-    </div>
-    <div class="pop-field">
-      <div class="pop-lbl">Starttijd</div>
-      <input id="pop-ghost-time" type="time" value="${_floatToTime(b.startHour)}">
+    <div class="pop-title" style="border-left:3px solid ${color}">✓ ${_esc(b.name)}</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">
+      ${_esc(b.day)} · ${_floatToTime(b.startHour)} · ${Math.round(b.durationHours * 60)} min
+      ${b.isShifted ? '<br><span style="color:#f97316;font-weight:700">Verschoven — geen vrije tijd op voorkeurstijdstip</span>' : ''}
     </div>
     <div class="pop-actions">
       <button class="pop-ok"  onclick="_confirmGhost()">Bevestig</button>
@@ -2211,18 +2238,10 @@ function _openGhostPopover(ghostId, x, y) {
 
 function _confirmGhost() {
   if (!_popCtx || _popCtx.type !== 'ghost') return;
-  const ghostId  = _popCtx.ghostId;
-  const dayVal   = (document.getElementById('pop-ghost-day')  || {}).value;
-  const timeVal  = (document.getElementById('pop-ghost-time') || {}).value;
-  const blocks   = _lsGet(KEYS.blocks, []);
-  const b = blocks.find(bl => bl.id === ghostId);
+  const blocks = _lsGet(KEYS.blocks, []);
+  const b = blocks.find(bl => bl.id === _popCtx.ghostId);
   if (!b) return;
-  const newDay   = dayVal  || b.day;
-  const newStart = _timeToFloat(timeVal || _floatToTime(b.startHour));
-  if (_checkOverlap(newDay, newStart, b.durationHours, ghostId)) {
-    showToast('⚠️ Overlapt met bestaand blok of werkshift'); return;
-  }
-  b.day = newDay; b.startHour = newStart; b.isGhost = false; b.done = false;
+  b.isGhost = false; b.isShifted = false; b.done = false;
   _lsSet(KEYS.blocks, blocks);
   _placeGhostBlocks(b);
   const saveDay = b.day;
