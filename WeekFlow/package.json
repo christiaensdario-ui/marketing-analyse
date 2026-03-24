@@ -1,0 +1,11 @@
+{
+  "name": "weekflow",
+  "version": "1.0.0",
+  "description": "WeekFlow — lokale planningsapp met AI",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
