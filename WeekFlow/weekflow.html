@@ -1242,7 +1242,7 @@ function _buildStep3() {
         ${totalHoursWeek > 0 ? `<div class="overview-total">Totaal: ~${totalHoursWeek.toFixed(1)} uur per week</div>` : ''}
       </div>
 
-      <button class="big-btn big-btn-ai" onclick="_startAIPlanning()">
+      <button class="big-btn big-btn-ai" id="btn-ai-plan" onclick="_startAIPlanning()">
         ✨ Genereer AI planning
       </button>
       <button class="big-btn big-btn-plan" onclick="_completeWizard()">
@@ -1290,40 +1290,41 @@ function _buildAIPayload() {
   };
 }
 
+function _setAIButtonLoading(loading) {
+  const btn = document.getElementById('btn-ai-plan');
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? '<span style="opacity:.7">⏳ AI is je planning aan het maken...</span>'
+    : '✨ Genereer AI planning';
+}
+
 async function _startAIPlanning() {
   _saveWizardToStorage();
-  _lsSet(KEYS.blocks, []);           // start with empty calendar
+  _lsSet(KEYS.blocks, []);
   const payload = _buildAIPayload();
-  _showAILoading(true);
+
+  _setAIButtonLoading(true);
+  document.getElementById('ai-loading')?.classList.remove('hidden');
+
   try {
     const blocks = await _callAnthropicAPI(payload);
-    _showAILoading(false);
-    if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('empty');
+    if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('empty response');
     _aiProposal   = blocks.map(b => ({ ...b, id: _genId() }));
     _aiRemovedIds = new Set();
     _screen = 'calendar';
     _render();
     _showAIPreviewOverlay();
   } catch (e) {
-    _showAILoading(false);
+    console.error('[WeekFlow] AI planning fout:', e);
     showToast('AI is even niet beschikbaar — je kan zelf plannen');
+  } finally {
+    _setAIButtonLoading(false);
+    document.getElementById('ai-loading')?.classList.add('hidden');
   }
 }
 
-function _showAILoading(show) {
-  const el = document.getElementById('ai-loading');
-  if (el) el.classList.toggle('hidden', !show);
-}
-
 async function _callAnthropicAPI(payload) {
-  const apiKey = localStorage.getItem('weekflow_api_key') || '';
-  const headers = {
-    'Content-Type': 'application/json',
-    'anthropic-version': '2023-06-01',
-    'anthropic-dangerous-direct-browser-access': 'true',
-  };
-  if (apiKey) headers['x-api-key'] = apiKey;
-
   const systemPrompt =
     'Je bent een slimme weekplanner. Je krijgt iemands werkrooster en categorievoorkeuren. ' +
     'Genereer een realistische weekplanning voor 2 weken. Regels:\n' +
@@ -1337,23 +1338,50 @@ async function _callAnthropicAPI(payload) {
     'Elk blok heeft: { date (YYYY-MM-DD), startHour (0-23), durationHours (0.5 stappen), ' +
     'category, name, isStudySession (bool), sessionNumber (1-4 of null) }';
 
+  const requestBody = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 2000,
+    system: systemPrompt,
+    messages: [
+      {
+        role: 'user',
+        content: JSON.stringify(payload),
+      }
+    ],
+  };
+
+  console.log('[WeekFlow] AI request body:', JSON.stringify(requestBody, null, 2));
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: JSON.stringify(payload) }],
-    }),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
   });
 
-  if (!response.ok) throw new Error('HTTP ' + response.status);
-  const data  = await response.json();
-  const text  = (data.content?.[0]?.text || '').trim();
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error('no JSON array');
-  return JSON.parse(match[0]);
+  const data = await response.json();
+  console.log('[WeekFlow] AI full response:', data);
+
+  if (!response.ok) {
+    throw new Error('HTTP ' + response.status + ': ' + (data?.error?.message || 'onbekende fout'));
+  }
+
+  const text = (data.content?.[0]?.text || '').trim();
+
+  // Strip markdown fences if present
+  const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // Extract JSON array
+  const match = stripped.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('Geen JSON array gevonden in response');
+
+  try {
+    return JSON.parse(match[0]);
+  } catch (parseErr) {
+    console.error('[WeekFlow] JSON parse fout:', parseErr, '\nTekst:', stripped);
+    throw new Error('Het AI voorstel kon niet worden verwerkt. Probeer opnieuw of plan zelf.');
+  }
 }
 
 function _showAIPreviewOverlay() {
