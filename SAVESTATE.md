@@ -2,13 +2,31 @@
 
 ## Laatste opslag
 **Datum:** 2026-03-24
-**Commit hash:** *(pending)*
+**Commit hash:** 377ffaa
 **Branch:** `master`
 **Remote:** https://github.com/christiaensdario-ui/marketing-analyse.git
 
 ---
 
 ## Samenvatting recente wijzigingen
+
+### Sessie 2026-03-24 — WeekFlow: AI planning fix + drag & drop verbeteringen
+
+#### AI planning (`_callAnthropicAPI`, `_startAIPlanning`, `_setAIButtonLoading`)
+- Alleen `Content-Type: application/json` header (geen x-api-key, geen anthropic-version)
+- `console.log` van request body vóór fetch + full response na parse
+- Markdown fences strippen (` ```json ``` `) vóór JSON.parse
+- try/catch op JSON.parse; foutmelding: "Het AI voorstel kon niet worden verwerkt. Probeer opnieuw of plan zelf."
+- `_setAIButtonLoading(loading)` — button uitgeschakeld + "⏳ AI is je planning aan het maken..." tijdens request
+- `id="btn-ai-plan"` op de knop in `_buildStep3()`
+- `try/finally` zodat button altijd opnieuw ingeschakeld wordt
+
+#### Drag & drop verbeteringen (`_initCalDragDrop`, `_initResizeHandles`)
+- Snap-to-full-hour bij drag vanuit sidebar én bij herplaatsen van bestaand blok
+- Visuele uur-cel highlight (`.drop-target`) tijdens dragover, verwijderd bij dragleave/drop
+- Resize handles (`.cal-resize-handle`) op elk blok: 30-min snap, conflictdetectie, tooltip `#cal-resize-tip`
+- Shake-animatie (`@keyframes cal-shake`) bij ongeldige drop of ongeldige resize
+- `_resizeState` variabele voorkomt dat HTML5-drag start tijdens resize
 
 ### Sessie 2026-03-24 — WeekFlow: studieplanning, ghost blocks, dagweergave
 
